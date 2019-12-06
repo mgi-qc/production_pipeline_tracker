@@ -200,6 +200,15 @@ def update_sample_statuses(dil_drop, info, smartsheet_cl, sample_status):
             ophub = wrksp
 
     for folder in smartsheet_cl.get_folder_list(ophub.id, 'w'):
+        if folder.name == 'Admin Projects':
+            admin_folder = folder
+
+    for folder in smartsheet_cl.get_folder_list(admin_folder.id, 'f'):
+        if folder.name == 'Active Projects':
+            projects_folder = folder
+
+    # TODO: Change this list of folders to the list in active projects
+    for folder in smartsheet_cl.get_folder_list(projects_folder.id, 'f'):
         if folder.name in samples_dict:
             for sheet in smartsheet_cl.get_object(folder.id,'f').sheets:
                 rows_to_update = []
