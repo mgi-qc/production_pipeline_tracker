@@ -1,0 +1,500 @@
+#!/usr/bin/python3.5
+import argparse
+import os
+import sys
+import datetime
+import csv
+import subprocess
+from shutil import copyfile
+from time import sleep
+
+
+import workflow_modules.ph_pcc_update as ph_pcc_update
+import workflow_modules.rwo_mss_create_update as rwo_mss_create_update
+import workflow_modules.smrtqc as smrtqc
+import workflow_modules.status_update as status_update
+import workflow_modules.woInfo as woInfo
+import workflow_modules.dilution_drop_off as ddo
+import workflow_modules.sequence_complete as sequence_complete
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-w', help='Input woid', type=str)
+parser.add_argument('-f', help='Input file', type=str)
+parser.add_argument('-ss', help='Sequencing scheduled', type=str)
+parser.add_argument('-sf', help='Sequencing scheduled failed samples file', type=str)
+parser.add_argument('-i', help='Sequencing scheduled status: Initial Sequencing Scheduled', action='store_true')
+parser.add_argument('-add', help='Add or append samples to MSS', action='store_true')
+parser.add_argument('-update', help='Update sample status', action='store_true')
+parser.add_argument('-s', help='Sequencing complete update', action='store_true')
+parser.add_argument('-qpcr', help='qPCR dropoff', action='store_true')
+parser.add_argument('-capture', help='Capture dropoff', action='store_true')
+parser.add_argument('-rba', help='Resource bank assessment', action='store_true')
+args = parser.parse_args()
+
+
+def get_column_ids(sheet_column_object):
+    column_id_dict = {}
+    for col in sheet_column_object:
+        column_id_dict[col.title] = col.id
+    return column_id_dict
+
+
+def get_project_hub(ssclient):
+
+    # production workspace
+    for space in ssclient.get_workspace_list():
+        if space.name == 'New Production Workspace':
+        # if space.name == 'Lee_OP_Dev':
+            op_hub_space = space
+
+    if not op_hub_space:
+        print('Workspace not found, check smartsheet status.')
+
+    # iterate over production sheets for ph and pch
+    for sheet in ssclient.get_sheet_list(op_hub_space.id, 'w'):
+        if 'Projects Hub' in sheet.name:
+            ph_sheet_object = ssclient.get_object(sheet.id, 's')
+            ph_sheet_column_dict = get_column_ids(ph_sheet_object.columns)
+            ph_info = [ph_sheet_object, ph_sheet_column_dict]
+
+        if 'Production Communications Center' in sheet.name:
+            prod_comm_hub_sheet = ssclient.get_object(sheet.id, 's')
+            pch_sheet_column_dict = get_column_ids(prod_comm_hub_sheet.columns)
+            pch_info = [prod_comm_hub_sheet, pch_sheet_column_dict]
+
+    return ph_info, pch_info
+
+
+def get_sample_sheet(ssclient, admin, update=None):
+
+    folder_exist = False
+    sheet_exists = False
+    active_project_id = ''
+    for space in ssclient.get_workspace_list():
+        if space.name == 'New Production Workspace':
+        # if space.name == 'Lee_OP_Dev':
+            op_hub_space = space
+
+    if not op_hub_space:
+        print('Workspace not found, check smartsheet status.')
+
+    for pw_folder in ssclient.get_folder_list(op_hub_space.id, 'w'):
+
+        if pw_folder.name == 'Admin Projects':
+
+            for admin_space in ssclient.smart_sheet_client.Folders.get_folder(pw_folder.id, 'w').folders:
+
+                if admin_space.name == 'Active Projects':
+
+                    active_project_id = admin_space.id
+
+                    for folder in ssclient.smart_sheet_client.Folders.get_folder(admin_space.id, 'w').folders:
+
+                        if len(admin) > 50:
+                            admin = admin[:50]
+
+                        if admin == folder.name:
+                            folder_exist = True
+
+                            newest_sheet = 0
+                            mss_sheets_to_update = {folder.id: {}}
+                            for sheet in ssclient.get_sheet_list(folder.id, 'f'):
+                                if 'MSS_' in sheet.name:
+                                    sheet_exists = True
+                                    sheet_number = int(sheet.name.split('_')[-1])
+                                    if sheet_number > newest_sheet:
+                                        newest_sheet = sheet_number
+                                        id_ = sheet.id
+
+                                    # populate MSS sheet in update dict
+                                    mss_sheets_to_update[folder.id][sheet.name] = sheet.id
+
+                            if update:
+                                return mss_sheets_to_update
+
+                            if sheet_exists:
+                                sample_sheet = ssclient.get_object(id_, 's')
+                                sample_sheet_column_dict = get_column_ids(sample_sheet.columns)
+                                return folder_exist, [sample_sheet, sample_sheet_column_dict, folder.id]
+
+                            if not sheet_exists:
+                                return sheet_exists, folder.id
+
+    if not folder_exist and not update:
+        if len(admin) > 50:
+            admin = admin[:50]
+        new_folder_response = ssclient.create_folder(admin, active_project_id, 'f')
+        print('\n{a} folder not found.\nCreating {a} folder for sample tracking'.format(a=admin))
+        return folder_exist, new_folder_response.data.id
+
+    return False
+
+
+def update_admin_email(ssclient, facilitator):
+    # print(facilitator)
+    user_sheet = ssclient.get_object(2641761152591748, 's')
+    sheet_column_dict = get_column_ids(user_sheet.columns)
+    found_user = False
+
+    for row in user_sheet.rows:
+        for cell in row.cells:
+            if cell.column_id == sheet_column_dict['Name'] and facilitator == cell.value:
+                found_user = True
+
+            if cell.column_id == sheet_column_dict['User Name'] and facilitator == cell.value:
+                found_user = True
+
+            if found_user and cell.column_id == sheet_column_dict['Email Address']:
+                return cell.value
+
+    return 'pmgroup@gowustl.onmicrosoft.com'
+
+
+def create_mss_sheet_name(admin_name):
+    new_string = ''
+    added_words = 0
+    for i, word in enumerate(admin_name.split()):
+        if added_words <= 4:
+            if word[0].upper().isalpha():
+                added_words += 1
+                new_string += '{} '.format(word)
+
+    if len(new_string) > 43:
+        new_string = new_string[:40]
+
+    return new_string.strip() + '-MSS_1'
+
+
+woids = []
+if args.f:
+    if not os.path.isfile(args.f):
+        sys.exit('{} file not found.')
+
+    with open(args.f, 'r') as f:
+        for line in f:
+            woids.append(line.strip())
+
+if args.w:
+    woids.append(args.w)
+
+
+def main():
+
+    if (args.f or args.w) and (args.add or args.update or args.s):
+
+        for woid in woids:
+            print('\n**********\nStarting update on {}:\n'.format(woid))
+            sleep(15)
+
+            if args.add:
+
+                w = woInfo.woInfo(woid)
+
+                # get admin_collections
+                admin_info = w.get_admin()
+                if not admin_info:
+                    sys.exit('{} returned no results, exiting'.format(woid))
+                print('Processing {} for Smartsheet tracking.'.format(woid))
+
+                for k, v in admin_info.items():
+                    print(k, ': ', v)
+
+                # get samples for resource work order id
+                print('\nGenerating sample.tsv from wo_info.')
+                sample_data = w.get_samples()
+                if not sample_data:
+                    print('{} wo_info returned no samples.'.format(woid))
+                    # continue
+
+                # init smartsheet connection
+                s = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+                admin_info['user email'] = update_admin_email(s, admin_info['Facilitator'])
+
+                # get project hub, production communication sheets
+                ph, phc = get_project_hub(s)
+
+                # init project hub resource
+                ph_update = ph_pcc_update.phRowUpdate(ph[0], ph[1], admin_info, woid)
+                pcc_update = ph_pcc_update.phRowUpdate(phc[0], phc[1], admin_info, woid)
+
+                # check to see if rwo already exist in ph
+                ph_duplicate_test = ph_update.duplicate_rwo_check('ph')
+                if ph_duplicate_test:
+                    print('Skipping {}, resource work order already exists in Project Hub.'.format(woid))
+                    continue
+
+                phc_duplicate_test = pcc_update.duplicate_rwo_check('phc')
+                if phc_duplicate_test:
+                    print('\nSkipping {}, resource work order already exists in Production Communciations Hub.'.format(
+                        woid))
+                    continue
+
+                # update sample sheets
+                # update project hub with resource work order
+                ph_update.ph_update(s)
+                pcc_update.pcc_update(s)
+
+                # check for sample folder, if exists, get sheet add samples
+                sheet_exists, sample_sheet_info = get_sample_sheet(s, admin_info['Administration Project'])
+
+                if not sample_data:
+                    continue
+
+                if admin_info['Status'] == 'abandoned':
+                    print('No MSS updates, status: abandoned')
+                    continue
+
+                print('{}, samples found to add: {}'.format(woid, len(sample_data)))
+
+                if not sheet_exists:
+                    new_mss_sheet = create_mss_sheet_name(admin_info['Administration Project'])
+                    sample_update = rwo_mss_create_update.sampleUpdate(sample_sheet_info, sample_data,
+                                                                       admin_info, s, new_mss_sheet)
+                    new_sheet_id = sample_update.construct_sheet(new_mss_sheet)
+                    new_sheet_object = s.get_object(new_sheet_id, 's')
+                    sample_sheet_info = [new_sheet_object, get_column_ids(new_sheet_object.columns), sample_sheet_info]
+
+                sample_update_new = rwo_mss_create_update.sampleUpdate(
+                    sample_sheet_info, sample_data, admin_info, s,
+                    create_mss_sheet_name(admin_info['Administration Project']))
+                sample_update_new.write_to_sheet()
+
+                phn, pccn = get_project_hub(s)
+                ph_update_n = ph_pcc_update.phRowUpdate(phn[0], phn[1], admin_info, woid)
+                samp_num_result = ph_update_n.update_sample_number(s, len(sample_data))
+
+                pcc_update_n = ph_pcc_update.phRowUpdate(pccn[0], pccn[1], admin_info, woid)
+                samp_num_result = pcc_update_n.update_sample_number(s, len(sample_data), type_='pcc')
+
+                # add/update MSS sheet links as comment
+                smartsheet_mss_sample_sheets = get_sample_sheet(s, admin_info['Administration Project'], update=True)
+
+                ph_update_n.ph_mss_url_add_update(ss_conn=s, ph_sheet_col_dict=phn,
+                                                  admin=admin_info['Administration Project'],
+                                                  mss_sheets=smartsheet_mss_sample_sheets)
+
+                if os.path.isfile('{}.sample.tsv'.format(woid)):
+                    os.remove('{}.sample.tsv'.format(woid))
+
+                print('\nSmartsheet resource work order tracking updates complete.')
+
+            if args.update:
+
+                swo_date = datetime.datetime.now().isoformat()
+
+                w = woInfo.woInfo(woid)
+                admin_info = w.get_admin()
+
+                print('Processing {} for Smartsheet tracking.'.format(woid))
+                for k, v in admin_info.items():
+                    print(k, ': ', v)
+
+                # init smartsheet connection
+                s = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+                admin_info['user email'] = update_admin_email(s, admin_info['Facilitator'])
+                sample_data = w.get_samples()
+
+                ph, pcc = get_project_hub(s)
+
+                # init project hub resource
+                ph_update = ph_pcc_update.phRowUpdate(ph[0], ph[1], admin_info, woid)
+
+                ph_duplicate_test = ph_update.duplicate_rwo_check('ph')
+                if ph_duplicate_test:
+                    # sys.exit('{} resource work order already exists in Project Hub.'.format(woid))
+                    print('\nSkipping {}, resource work order exists in Project Hub.'.format(woid))
+                    continue
+
+                p_update = ph_update.ph_update(s)
+
+                if not sample_data:
+                    print('{} wo_info returned no samples.'.format(woid))
+                    continue
+
+                if admin_info['Status'] == 'abandoned':
+                    print('No MSS updates, status: abandoned')
+                    continue
+
+                print('\n{}, samples found to update: {}'.format(woid, len(sample_data)))
+
+                # get sample sheet(s)
+                smartsheet_mss_sample_sheets = get_sample_sheet(s, admin_info['Administration Project'], update=True)
+
+                # iterate over each sheet, if sample exists create row update object
+                # push row updates to smartsheet
+                sn = status_update.SampleUpdate(ss_conn=s, sheet_dict=smartsheet_mss_sample_sheets,
+                                                samples=sample_data, project_info=admin_info, date=swo_date)
+                sn.update_sample()
+
+                phn, pccn = get_project_hub(s)
+                ph_update_n = ph_pcc_update.phRowUpdate(phn[0], phn[1], admin_info, woid)
+                samp_num_result = ph_update_n.update_sample_number(s, len(sample_data))
+
+                if os.path.isfile('{}.sample.tsv'.format(woid)):
+                    os.remove('{}.sample.tsv'.format(woid))
+
+                print('\nSmartsheet resource work order tracking updates complete.')
+
+            if args.s:
+
+                print('Processing {} for Smartsheet tracking'.format(woid))
+
+                pcc = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+                i = sequence_complete.SequencingUpdate()
+
+                # get project hub, production communication sheets
+                ph, pccs = get_project_hub(pcc)
+
+                print('Generating illumina_info report')
+
+                sample_data, outfile = i.illumina_info(woid=woid)
+                if not sample_data:
+                    continue
+                print('{} Samples from illumina_info sequence complete'.format(len(sample_data)))
+
+                # get admin info
+                w = woInfo.woInfo(woid)
+                admin_info = w.get_admin()
+
+                print('\nWork Order Billing Information:')
+                for k, v in admin_info.items():
+                    print('{}: {}'.format(k, v))
+
+                # init smartsheet connection
+                print('\nUpdating MSS sheets:\n')
+                # get mss sheets
+                s = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+                admin_info['user email'] = update_admin_email(s, admin_info['Facilitator'])
+                smartsheet_mss_sample_sheets = get_sample_sheet(s, admin_info['Administration Project'], update=True)
+                updated_sample_num = i.update_mss_sheet(ss_conn=s, admin_info=admin_info, sample_data=sample_data,
+                                                        sheet_info_dict=smartsheet_mss_sample_sheets)
+
+                i.pcc_update(ss_connector=pcc, pccs=pccs, woid=woid, admin_info=admin_info,
+                             sample_number=updated_sample_num, attachment=outfile)
+
+                print('illumina_info process status: {} samples Sequence Complete'.format(updated_sample_num))
+
+    if args.ss:
+
+        print('\nScheduling Sequencing\n')
+
+        ddo_update_status = 'Sequencing Scheduled'
+        if args.i:
+            ddo_update_status = 'Initial Sequencing Scheduled'
+
+        if not os.path.isfile(args.ss):
+            sys.exit('{} file not found.'.format(args.d))
+
+        failed_samples = {}
+        if args.sf:
+            with open(args.sf, 'r') as fh:
+                file_dict = csv.DictReader(fh, delimiter='\t')
+                for l in file_dict:
+                    failed_samples[l['Sample']] = l['Work Order']
+
+        # start dilution drop off processing
+        d = ddo.Ddo(args.ss)
+
+        print('Running barcode_info dilution drop off')
+        sample_file = d.run_bc_info()
+        print('barcode_info outfile: {}'.format(sample_file))
+        ddo_date = datetime.datetime.now().isoformat()
+
+        if not os.path.isfile(sample_file):
+            sys.exit('{} file not generated'.format(sample_file))
+
+        ddo_woids, bc_dict = d.get_woids(sample_file)
+
+        print('Running barcode_info sample_inventory')
+        ddo_samples, sample_outfile = d.get_samples(bc_dict.keys())
+        print('barcode_info sample_inventory outfile: {}'.format(sample_outfile))
+
+        # init smartsheet connection
+        pcc = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+
+        # get project hub, production communication sheets
+        ph, pccs = get_project_hub(pcc)
+
+        pcc_duplicate_test, dup_bc = d.dup_pcc_bc_check(pccs, bc_dict)
+        if pcc_duplicate_test:
+            sys.exit('\n{} barcode already exists in Production Communciations Hub.\n'.format(dup_bc))
+
+        print('\nWork Order Billing Information:')
+        project_folders = set()
+        for wo in ddo_woids:
+
+            # query woid for admin info
+            w = woInfo.woInfo(wo)
+
+            # get admin_collections
+            admin_info = w.get_admin()
+
+            # turned off because multiple facilitators
+            # for bc in bc_dict:
+            #     bc_dict[bc]['user email'] = update_admin_email(pcc, admin_info['Facilitator'])
+            #     if wo in bc_dict[bc]['woids']:
+            #         bc_dict[bc]['admin'].add(admin_info['Administration Project'])
+
+            # get folders
+            project_folders.add(admin_info['Administration Project'])
+
+            if not admin_info:
+                sys.exit('{} returned no results, exiting'.format(wo))
+
+            print('\nProcessing {} for smartsheet tracking.'.format(wo))
+            for k, v in admin_info.items():
+                print(k, ': ', v)
+
+        d.pcc_update(ss_connector=pcc, pcc_sheet_col_dict=pccs, barcode_dict=bc_dict, date=ddo_date,
+                     status=ddo_update_status, attachment=sample_file, failures=len(failed_samples),
+                     total_samples=len(ddo_samples))
+
+        for project in project_folders:
+            print('\nUpdating samples for: {}'.format(project))
+
+            # get project mss sheets
+            s = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+            smartsheet_mss_sample_sheets = get_sample_sheet(s, project, update=True)
+
+            if not smartsheet_mss_sample_sheets:
+                print('{} folder not found, skipping sample update'.format(project))
+                continue
+
+            # update samples
+            pcc_fails = d.sample_update(ss_conn=s, sample_sheet_dict=smartsheet_mss_sample_sheets, woids=ddo_woids,
+                                        pipe=admin_info['Pipeline'], samples=ddo_samples, date=ddo_date,
+                                        status=ddo_update_status, fails=failed_samples)
+
+            # turned off adding fails to barcode, needs updating if it's going to be used.
+            # pcc = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+            #
+            # # get project hub, production communication sheets
+            # ph, pccs = get_project_hub(pcc)
+            # d.pcc_fails_update(s, pccs, pcc_fails)
+        # TODO: Check that these work as expected.
+        if os.path.exists(sample_file):
+            copyfile(sample_file, '/gscmnt/gc2746/production/smartflow/production_files/sequence_complete/{}'
+                     .format(sample_file))
+
+        if os.path.exists(sample_outfile):
+            os.remove(sample_outfile)
+
+        print('\nDilution Drop Off Complete\n')
+
+    if args.qpcr:
+        if not args.f:
+            sys.exit('Please run with: -f <input_file>')
+        subprocess.run(["python3", "/gscmnt/gc2746/production/smartflow/bin/workflow_modules/qPCR_dropoff_wrapper.py",
+                        "-f", args.f, "-q"])
+
+    if args.capture:
+        if not args.f:
+            sys.exit('Please run with: -f <input_file>')
+        subprocess.run(["python3", "/gscmnt/gc2746/production/smartflow/bin/workflow_modules/qPCR_dropoff_wrapper.py",
+                        "-f", args.f, "-c"])
+    if args.rba:
+        subprocess.run(["python3", "/gscmnt/gc2746/production/smartflow/bin/workflow_modules/rb_assessment.py"])
+
+
+if __name__ == '__main__':
+    main()
