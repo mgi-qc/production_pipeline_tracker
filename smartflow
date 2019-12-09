@@ -26,6 +26,7 @@ parser.add_argument('-i', help='Sequencing scheduled status: Initial Sequencing 
 parser.add_argument('-add', help='Add or append samples to MSS', action='store_true')
 parser.add_argument('-update', help='Update sample status', action='store_true')
 parser.add_argument('-s', help='Sequencing complete update', action='store_true')
+parser.add_argument('-tkb', help='Sequencing complete total kb cut off', type=int)
 parser.add_argument('-qpcr', help='qPCR dropoff', action='store_true')
 parser.add_argument('-capture', help='Capture dropoff', action='store_true')
 parser.add_argument('-rba', help='Resource bank assessment', action='store_true')
@@ -203,8 +204,8 @@ def main():
                 print('\nGenerating sample.tsv from wo_info.')
                 sample_data = w.get_samples()
                 if not sample_data:
-                    print('{} wo_info returned no samples.'.format(woid))
-                    # continue
+                    print('{} wo_info returned no samples or duplicate found.'.format(woid))
+                    continue
 
                 # init smartsheet connection
                 s = smrtqc.SmartQC(os.environ.get('SMRT_API'))
@@ -292,7 +293,11 @@ def main():
                 # init smartsheet connection
                 s = smrtqc.SmartQC(os.environ.get('SMRT_API'))
                 admin_info['user email'] = update_admin_email(s, admin_info['Facilitator'])
+
                 sample_data = w.get_samples()
+                if not sample_data:
+                    print('{} wo_info returned no samples or duplicate found.'.format(woid))
+                    continue
 
                 ph, pcc = get_project_hub(s)
 
@@ -347,7 +352,12 @@ def main():
 
                 print('Generating illumina_info report')
 
-                sample_data, outfile = i.illumina_info(woid=woid)
+                total_kb_cutoff = 63000000
+                if args.tkb:
+                    total_kb_cutoff = args.tkb
+
+                sample_data, outfile, failed_samples = i.illumina_info(woid=woid, cutoff=total_kb_cutoff)
+
                 if not sample_data:
                     continue
                 print('{} Samples from illumina_info sequence complete'.format(len(sample_data)))
@@ -367,7 +377,8 @@ def main():
                 admin_info['user email'] = update_admin_email(s, admin_info['Facilitator'])
                 smartsheet_mss_sample_sheets = get_sample_sheet(s, admin_info['Administration Project'], update=True)
                 updated_sample_num = i.update_mss_sheet(ss_conn=s, admin_info=admin_info, sample_data=sample_data,
-                                                        sheet_info_dict=smartsheet_mss_sample_sheets)
+                                                        sheet_info_dict=smartsheet_mss_sample_sheets,
+                                                        failed_samples=failed_samples)
 
                 i.pcc_update(ss_connector=pcc, pccs=pccs, woid=woid, admin_info=admin_info,
                              sample_number=updated_sample_num, attachment=outfile)

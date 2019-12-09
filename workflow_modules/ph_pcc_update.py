@@ -1,5 +1,5 @@
 import os
-import smartsheet
+from time import sleep
 
 
 class phRowUpdate:
@@ -53,7 +53,7 @@ class phRowUpdate:
         new_row.cells.append({'column_id': self.col_dict['Pipeline'], 'value': self.admin['Pipeline']})
         new_row.cells.append({'column_id': self.col_dict['Description'], 'value': self.admin['Description']})
         new_row.cells.append({'column_id': self.col_dict['Date Created'], 'value': self.admin['WO Start Date']})
-        new_row.cells.append({'column_id': self.col_dict['WOID Active Status'], 'value': self.admin['Status']})
+        new_row.cells.append({'column_id': self.col_dict['WOID Status'], 'value': self.admin['Status']})
         new_row.cells.append({'column_id': self.col_dict['Facilitator'], 'object_value': self.admin['user email']},)
         new_row.cells.append({'column_id': self.col_dict['Billing Account'], 'value': self.admin['Billing Account']})
         new_row.cells.append({'column_id': self.col_dict['Accounts Payable Contact'], 'value': 'NHGRI'})
@@ -69,8 +69,10 @@ class phRowUpdate:
             new_row_id = r.id
 
         if os.path.isfile(attachment):
+            sleep(2)
             ss_connector.smart_sheet_client.Attachments.attach_file_to_row(
                 self.sheet.id, new_row_id, (attachment, open(attachment, 'rb'), 'application/Excel'))
+            sleep(10)
         return
 
     def ph_update(self, ss_connector):
@@ -97,9 +99,11 @@ class phRowUpdate:
             new_rwo_header_row = ss_connector.smart_sheet_client.models.Row({"format": ",,1,,,,,,,18,,,,,,"})
             new_rwo_header_row.cells.append({'column_id': self.col_dict['Projects'], 'value': self.admin['Pipeline']})
             new_rwo_header_row.cells.append({'column_id': self.col_dict['Items'], 'formula': '=SUM(CHILDREN())'})
-            new_rwo_header_row.cells.append({'column_id': self.col_dict['WOID Active Status'], '': '=SUM(CHILDREN())'})
+            new_rwo_header_row.cells.append({'column_id': self.col_dict['WOID Status'],
+                                             'formula': '=SUM(CHILDREN())'})
             new_rwo_header_row.to_bottom = True
             new_rwo_header_row.parent_id = admin_row_number
+
             rwo_row_response = ss_connector.smart_sheet_client.Sheets.add_rows(self.sheet.id, [new_rwo_header_row])
 
             for r in rwo_row_response.data:
@@ -119,7 +123,7 @@ class phRowUpdate:
                     'url': 'https://imp-lims.ris.wustl.edu/entity/administration-project/?project_name={}'.format(
                         self.admin['Administration Project'].replace(' ', '+'))}})
             new_admin_row.cells.append({'column_id': self.col_dict['Items'], 'formula': '=SUM(CHILDREN())'})
-            new_admin_row.cells.append({'column_id': self.col_dict['WOID Active Status'],
+            new_admin_row.cells.append({'column_id': self.col_dict['WOID Status'],
                                         'formula': '=SUM(CHILDREN())'})
             new_admin_row.to_bottom = True
             new_admin_row.parent_id = project_name_row_id
@@ -139,7 +143,7 @@ class phRowUpdate:
                 new_header_row = ss_connector.smart_sheet_client.models.Row({"format": ",,1,,,,,,,18,,,,,,"})
                 new_header_row.cells.append({'column_id': self.col_dict['Projects'], 'value': title_row})
                 new_header_row.cells.append({'column_id': self.col_dict['Items'], 'formula': '=SUM(CHILDREN())'})
-                new_header_row.cells.append({'column_id': self.col_dict['WOID Active Status'],
+                new_header_row.cells.append({'column_id': self.col_dict['WOID Status'],
                                              'formula': '=SUM(CHILDREN())'})
                 new_header_row.to_bottom = True
                 new_header_row.parent_id = new_admin_row_number
@@ -189,8 +193,10 @@ class phRowUpdate:
                     attachment = '{}.sample.tsv'.format(self.woid)
 
                     if os.path.isfile(attachment):
+                        sleep(2)
                         ss_connector.smart_sheet_client.Attachments.attach_file_to_row(
                             self.sheet.id, new_row_id, (attachment, open(attachment, 'rb'), 'application/Excel'))
+                        sleep(10)
 
     def update_sample_number(self, ss_connector, sample_num, type_=None):
 

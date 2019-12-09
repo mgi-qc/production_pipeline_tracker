@@ -93,7 +93,8 @@ class woInfo:
                 if line['Sample Full Name'] not in data:
                     data[line['Sample Full Name']] = line
                 else:
-                    sys.exit('{} sample is duplicate'.format(line['Sample Full Name']))
+                    print('{} sample is duplicate'.format(line['Sample Full Name']))
+                    return False
 
         return data
 
