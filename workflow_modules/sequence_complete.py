@@ -7,18 +7,18 @@ import subprocess
 class SequencingUpdate:
 
     mss_required_columns = ['Work Order ID',
-                            'Current Pipeline Status',
+                            'Pipeline',
                             'Current Production Status',
                             'WOI Status',
                             'Sample Full Name',
                             'Sequencing Completed Date']
 
-    def illumina_info(self, woid):
+    def illumina_info(self, woid, cutoff):
 
         date = datetime.datetime.now().strftime("%m%d%y")
         hour_min = datetime.datetime.now().strftime("%H%M")
         outfile_temp = 'illumina_info_temp.tsv'
-        outfile = 'library_index_summary.{}.{}.tsv'.format(hour_min, date)
+        outfile = 'library_index_summary.totalkb.pass.{}.{}.tsv'.format(hour_min, date)
         failed_file = 'library_index_summary.totalkb.fail.{}.{}.tsv'.format(hour_min, date)
         woid_arg = '--woid={}'.format(woid)
 
@@ -47,22 +47,25 @@ class SequencingUpdate:
 
             data = {}
             fails_found = False
+            failed_samples_report = []
             failed_samples = []
 
             for line in fh:
-                if float(line['Total Bases Kb (PF)'].replace(',', '')) >= 63000000:
+                if float(line['Total Bases Kb (PF)'].replace(',', '')) >= cutoff:
                     data[line['Library'].split('-lib')[0]] = line
                     temp_writer.writerow(line)
                 else:
                     fails_found = True
                     fail_writer.writerow(line)
-                    failed_samples.append('{}\t{}'.format(line['Library'].split('-lib')[0],line['Total Bases Kb (PF)']))
+                    failed_samples.append(line['Library'].split('-lib')[0])
+                    failed_samples_report.append('{}\t{}'.format(line['Library'].split('-lib')[0],
+                                                                 line['Total Bases Kb (PF)']))
 
         os.replace(outfile_temp, outfile)
 
         if fails_found:
-            print('Samples failed to meet total bases threshold: {}'.format(len(failed_samples)))
-            print('\n'.join(failed_samples))
+            print('Samples failed to meet total bases threshold: {}'.format(len(failed_samples_report)))
+            print('\n'.join(failed_samples_report))
             print('\nFailed sample file: {}'.format(failed_file))
 
         else:
@@ -71,102 +74,137 @@ class SequencingUpdate:
 
         print('Report outfile: {}\n'.format(outfile))
 
-        return data, outfile
+        return data, outfile, failed_samples
 
-    def update_mss_sheet(self, ss_conn, admin_info, sample_data, sheet_info_dict):
+    def update_mss_sheet(self, ss_conn, admin_info, sample_data, sheet_info_dict, failed_samples):
 
         total_samples = len(sample_data)
+        print('Sequence complete samples from illumina_info report: {}'.format(total_samples))
         total_updated_samples = 0
+        total_existing_seq_complete_samples = 0
         update_sample_name = []
+        seq_complete_samples = []
 
         for folder, sheet_info in sheet_info_dict.items():
 
-            for sheet_name, sheet_id in sorted(sheet_info.items()):
+            date = datetime.datetime.now().strftime("%m%d%y")
+            outfile = '{}.sequence.scheduled.all.{}.tsv'.format(admin_info['Work Order ID'], date)
+            outfile_new_samples = '{}.sequence.scheduled.new.{}.tsv'.format(admin_info['Work Order ID'], date)
+            with open(outfile, 'w') as f, open(outfile_new_samples, 'w') as o_new:
 
-                mss_update_col = []
-                updated_rows = []
+                outfile_header = ['Work Order ID', 'Sample Full Name', 'Pipeline', 'Current Production Status',
+                                  'Sequencing Completed Date']
+                f_write = csv.DictWriter(f, fieldnames=outfile_header, delimiter='\t')
+                f_write.writeheader()
 
-                match = []
-                fail = []
+                o_new_write = csv.DictWriter(o_new, fieldnames=outfile_header, delimiter='\t')
+                o_new_write.writeheader()
 
-                updated_samples = 0
+                for sheet_name, sheet_id in sorted(sheet_info.items()):
 
-                sheet_col_ids = ss_conn.get_column_ids(sheet_id)
+                    mss_update_col = []
+                    updated_rows = []
 
-                # get required column id's to pull from sheet
-                for col_title, col_id in sheet_col_ids.items():
-                    if col_title in self.mss_required_columns:
-                        mss_update_col.append(col_id)
+                    updated_samples = 0
+                    already_seq_complete_samples = 0
 
-                mss_sheet = ss_conn.get_sheet_with_columns(sheet_id=sheet_id, column_list=mss_update_col)
+                    sheet_col_ids = ss_conn.get_column_ids(sheet_id)
 
-                for row in mss_sheet.rows:
+                    # get required column id's to pull from sheet
+                    for col_title, col_id in sheet_col_ids.items():
+                        if col_title in self.mss_required_columns:
+                            mss_update_col.append(col_id)
 
-                    sample_found = False
-                    swoid_found = False
+                    mss_sheet = ss_conn.get_sheet_with_columns(sheet_id=sheet_id, column_list=mss_update_col)
 
-                    for cell in row.cells:
+                    for row in mss_sheet.rows:
 
-                        if cell.column_id == sheet_col_ids['Work Order ID']:
-                            swoid = cell.value
-                            for k, v in sample_data.items():
-                                if str(swoid) in sample_data[k]['WorkOrder']:
-                                    swoid_found = True
+                        sample_found = False
+                        swoid_found = False
+                        sample_data_dict = dict.fromkeys(outfile_header, 'NA')
 
-                        if cell.column_id == sheet_col_ids['Sample Full Name']:
-                            sample_name = cell.value
-                            if sample_name in sample_data.keys():
-                                sample_found = True
+                        for cell in row.cells:
 
-                        if cell.column_id == sheet_col_ids['Current Production Status']:
-                            sample_production_status = cell.value
+                            if cell.column_id == sheet_col_ids['Work Order ID']:
+                                swoid = cell.value
+                                sample_data_dict['Work Order ID'] = swoid
+                                for k, v in sample_data.items():
+                                    if str(swoid) in sample_data[k]['WorkOrder']:
+                                        swoid_found = True
 
-                    if sample_found and swoid_found:
+                            if cell.column_id == sheet_col_ids['Sample Full Name']:
+                                sample_name = cell.value
+                                sample_data_dict['Sample Full Name'] = sample_name
+                                if sample_name in sample_data.keys():
+                                    sample_found = True
 
-                        if sample_production_status != 'Sequence Complete':
-                            updated_samples += 1
+                            if cell.column_id == sheet_col_ids['Current Production Status']:
+                                sample_production_status = cell.value
+                                sample_data_dict['Current Production Status'] = sample_production_status
 
-                            new_row = ss_conn.smart_sheet_client.models.Row()
-                            new_row.id = row.id
+                            if cell.column_id == sheet_col_ids['Pipeline']:
+                                sample_data_dict['Pipeline'] = cell.value
 
-                            new_cell = ss_conn.smart_sheet_client.models.Cell()
-                            new_cell.column_id = sheet_col_ids['Current Production Status']
-                            new_cell.value = 'Sequencing Completed'
-                            new_row.cells.append(new_cell)
+                            if cell.column_id == sheet_col_ids['Sequencing Completed Date']:
+                                sample_data_dict['Sequencing Completed Date'] = cell.value
 
-                            new_cell = ss_conn.smart_sheet_client.models.Cell()
-                            new_cell.column_id = sheet_col_ids['Sequencing Completed Date']
-                            new_cell.value = datetime.datetime.now().isoformat()
-                            new_row.cells.append(new_cell)
+                        if sample_found and swoid_found:
 
-                            new_cell = ss_conn.smart_sheet_client.models.Cell()
-                            new_cell.column_id = sheet_col_ids['Current Pipeline Status']
-                            new_cell.value = admin_info['Pipeline']
-                            new_row.cells.append(new_cell)
+                            if sample_production_status == 'Sequencing Completed' or 'QC' in sample_production_status:
+                                total_existing_seq_complete_samples += 1
+                                already_seq_complete_samples += 1
+                                seq_complete_samples.append(sample_name)
+                                f_write.writerow(sample_data_dict)
+                                continue
 
-                            new_cell = ss_conn.smart_sheet_client.models.Cell()
-                            new_cell.column_id = sheet_col_ids['WOI Status']
-                            new_cell.value = admin_info['Status']
-                            new_row.cells.append(new_cell)
+                            if sample_production_status != 'Sequencing Completed' or 'QC' not in sample_production_status:
+                                updated_samples += 1
 
-                            updated_rows.append(new_row)
-                            update_sample_name.append(sample_name)
+                                new_row = ss_conn.smart_sheet_client.models.Row()
+                                new_row.id = row.id
 
-                            continue
+                                new_cell = ss_conn.smart_sheet_client.models.Cell()
+                                new_cell.column_id = sheet_col_ids['Current Production Status']
+                                new_cell.value = 'Sequencing Completed'
+                                sample_data_dict['Current Production Status'] = 'Sequencing Completed'
+                                new_row.cells.append(new_cell)
 
-                update = ss_conn.smart_sheet_client.Sheets.update_rows(mss_sheet.id, updated_rows)
-                print(sheet_name)
-                print('Sequence complete samples to update: {}'.format(total_samples))
-                print('Samples updated: {}'.format(updated_samples))
-                print('Samples remaining: {}\n'.format(total_samples - updated_samples))
+                                new_cell = ss_conn.smart_sheet_client.models.Cell()
+                                new_cell.column_id = sheet_col_ids['Sequencing Completed Date']
+                                new_cell.value = datetime.datetime.now().isoformat()
+                                sample_data_dict['Sequencing Completed Date'] = datetime.datetime.now().isoformat()
+                                new_row.cells.append(new_cell)
 
-                total_samples = total_samples - updated_samples
-                total_updated_samples += updated_samples
+                                new_cell = ss_conn.smart_sheet_client.models.Cell()
+                                new_cell.column_id = sheet_col_ids['Pipeline']
+                                new_cell.value = admin_info['Pipeline']
+                                sample_data_dict['Pipeline'] = admin_info['Pipeline']
+                                new_row.cells.append(new_cell)
 
-        for sample in sample_data:
-            if sample not in update_sample_name:
-                print(sample)
-        return total_updated_samples
+                                new_cell = ss_conn.smart_sheet_client.models.Cell()
+                                new_cell.column_id = sheet_col_ids['WOI Status']
+                                new_cell.value = admin_info['Status']
+                                new_row.cells.append(new_cell)
+
+                                updated_rows.append(new_row)
+                                update_sample_name.append(sample_name)
+                                f_write.writerow(sample_data_dict)
+                                o_new_write.writerow(sample_data_dict)
+
+                                continue
+
+                    update = ss_conn.smart_sheet_client.Sheets.update_rows(mss_sheet.id, updated_rows)
+                    print(sheet_name)
+                    print('Samples updated: {}'.format(updated_samples))
+
+                    total_samples = total_samples - updated_samples
+                    total_updated_samples += updated_samples
+
+            print('\nFailed to update samples:')
+            for sample in sample_data:
+                if sample not in update_sample_name and sample not in seq_complete_samples:
+                    print(sample)
+            return total_updated_samples
 
     def pcc_find_sibling_id(self, pccs, woid, admin_project):
 
@@ -200,7 +238,7 @@ class SequencingUpdate:
 
         sibling_id = self.pcc_find_sibling_id(pccs=pccs, woid=woid, admin_project=admin_info['Administration Project'])
 
-        print('Updating Production Communications Sheet')
+        print('\nUpdating Production Communications Sheet')
         sheet, col_dict = pccs
 
         for row in sheet.rows:
@@ -221,7 +259,7 @@ class SequencingUpdate:
                 'url': 'https://imp-lims.ris.wustl.edu/entity/administration-project/?project_name={}'.format(
                     admin_info['Administration Project'].replace(' ', '+'))}})
         new_swo_row.cells.append(
-            {'column_id': col_dict['Facilitator'], 'value': admin_info['user email']})
+            {'column_id': col_dict['Facilitator'], 'object_value': admin_info['user email']})
         new_swo_row.cells.append({'column_id': col_dict['Event Date'], 'value': datetime.datetime.now().isoformat()})
         new_swo_row.cells.append({'column_id': col_dict['Production Notes'], 'value': admin_info['Description']})
 

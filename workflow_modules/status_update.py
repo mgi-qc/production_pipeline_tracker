@@ -225,12 +225,13 @@ class SampleUpdate:
                             new_sibling_row.cells.append(new_cell)
                             continue
 
-                        if cell.column_id == sheet_column_ids['Resource Assessment Completed Date']:
-                            new_cell = self.ss_connector.smart_sheet_client.models.Cell()
-                            new_cell.column_id = sheet_column_ids['Resource Assessment Completed Date']
-                            new_cell.value = self.date
-                            new_sibling_row.cells.append(new_cell)
-                            continue
+                        # Date is for resource bank, not work orders.
+                        # if cell.column_id == sheet_column_ids['Resource Assessment Completed Date']:
+                        #     new_cell = self.ss_connector.smart_sheet_client.models.Cell()
+                        #     new_cell.column_id = sheet_column_ids['Resource Assessment Completed Date']
+                        #     new_cell.value = self.date
+                        #     new_sibling_row.cells.append(new_cell)
+                        #     continue
 
                         if cell.column_id == sheet_column_ids['WOID Description']:
                             new_cell = self.ss_connector.smart_sheet_client.models.Cell()
@@ -329,7 +330,6 @@ class SampleUpdate:
                             sample_iteration_number[sample_name]['update'] = True
                         update = self.ss_connector.smart_sheet_client.Sheets.add_rows(sheet_id, [new_sibling_row])
                         duplicate_samples_added += 1
-
 
                 if len(updated_rows) > 0:
                     update = self.ss_connector.smart_sheet_client.Sheets.update_rows(sheet.id, updated_rows)
