@@ -51,7 +51,6 @@ class SampleUpdate:
                              'Current Production Status': status,
                              'Pipeline': self.project_info['Pipeline'],
                              'WOI Status': self.project_info['Status'],
-                             'Resource Assessment Completed Date': self.date,
                              'WOID Creation Date': project_info['WO Start Date'],
                              'WOID Description': project_info['Description']}
 
@@ -225,14 +224,6 @@ class SampleUpdate:
                             new_sibling_row.cells.append(new_cell)
                             continue
 
-                        # Date is for resource bank, not work orders.
-                        # if cell.column_id == sheet_column_ids['Resource Assessment Completed Date']:
-                        #     new_cell = self.ss_connector.smart_sheet_client.models.Cell()
-                        #     new_cell.column_id = sheet_column_ids['Resource Assessment Completed Date']
-                        #     new_cell.value = self.date
-                        #     new_sibling_row.cells.append(new_cell)
-                        #     continue
-
                         if cell.column_id == sheet_column_ids['WOID Description']:
                             new_cell = self.ss_connector.smart_sheet_client.models.Cell()
                             new_cell.column_id = sheet_column_ids['WOID Description']
@@ -273,9 +264,6 @@ class SampleUpdate:
                         if cell.column_id == sheet_column_ids['Iteration']:
                             iteration_value = cell.value
                             continue
-
-                        # if cell.column_id in [sheet_column_ids['Fail'], sheet_column_ids['Data Transfer']]:
-                        #     continue
 
                         if cell.value is None:
                             continue

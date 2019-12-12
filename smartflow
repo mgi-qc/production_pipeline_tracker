@@ -5,7 +5,7 @@ import sys
 import datetime
 import csv
 import subprocess
-from shutil import copyfile
+from shutil import move
 from time import sleep
 
 
@@ -44,8 +44,7 @@ def get_project_hub(ssclient):
 
     # production workspace
     for space in ssclient.get_workspace_list():
-        if space.name == 'New Production Workspace':
-        # if space.name == 'Lee_OP_Dev':
+        if space.name == 'Smartflow Production Workspace':
             op_hub_space = space
 
     if not op_hub_space:
@@ -72,8 +71,7 @@ def get_sample_sheet(ssclient, admin, update=None):
     sheet_exists = False
     active_project_id = ''
     for space in ssclient.get_workspace_list():
-        if space.name == 'New Production Workspace':
-        # if space.name == 'Lee_OP_Dev':
+        if space.name == 'Smartflow Production Workspace':
             op_hub_space = space
 
     if not op_hub_space:
@@ -133,7 +131,7 @@ def get_sample_sheet(ssclient, admin, update=None):
 
 def update_admin_email(ssclient, facilitator):
     # print(facilitator)
-    user_sheet = ssclient.get_object(2641761152591748, 's')
+    user_sheet = ssclient.get_object(252568824768388, 's')
     sheet_column_dict = get_column_ids(user_sheet.columns)
     found_user = False
 
@@ -194,7 +192,8 @@ def main():
                 # get admin_collections
                 admin_info = w.get_admin()
                 if not admin_info:
-                    sys.exit('{} returned no results, exiting'.format(woid))
+                    print('{} returned no results, exiting'.format(woid))
+                    continue
                 print('Processing {} for Smartsheet tracking.'.format(woid))
 
                 for k, v in admin_info.items():
@@ -306,7 +305,6 @@ def main():
 
                 ph_duplicate_test = ph_update.duplicate_rwo_check('ph')
                 if ph_duplicate_test:
-                    # sys.exit('{} resource work order already exists in Project Hub.'.format(woid))
                     print('\nSkipping {}, resource work order exists in Project Hub.'.format(woid))
                     continue
 
@@ -397,6 +395,7 @@ def main():
             sys.exit('{} file not found.'.format(args.d))
 
         failed_samples = {}
+
         if args.sf:
             with open(args.sf, 'r') as fh:
                 file_dict = csv.DictReader(fh, delimiter='\t')
@@ -458,7 +457,7 @@ def main():
 
         d.pcc_update(ss_connector=pcc, pcc_sheet_col_dict=pccs, barcode_dict=bc_dict, date=ddo_date,
                      status=ddo_update_status, attachment=sample_file, failures=len(failed_samples),
-                     total_samples=len(ddo_samples))
+                     total_samples=len(ddo_samples), fail_infile=args.sf)
 
         for project in project_folders:
             print('\nUpdating samples for: {}'.format(project))
@@ -482,13 +481,10 @@ def main():
             # # get project hub, production communication sheets
             # ph, pccs = get_project_hub(pcc)
             # d.pcc_fails_update(s, pccs, pcc_fails)
-        # TODO: Check that these work as expected.
-        if os.path.exists(sample_file):
-            copyfile(sample_file, '/gscmnt/gc2746/production/smartflow/production_files/sequence_complete/{}'
-                     .format(sample_file))
 
-        if os.path.exists(sample_outfile):
-            os.remove(sample_outfile)
+        if os.path.exists(sample_file):
+            move('{}/{}'.format(os.getcwd(), sample_file),
+                 '/gscmnt/gc2746/production/smartflow/production_files/sequence_complete/{}'.format(sample_file))
 
         print('\nDilution Drop Off Complete\n')
 

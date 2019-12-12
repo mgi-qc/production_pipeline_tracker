@@ -1,13 +1,14 @@
 import csv
 import subprocess
 import datetime
+from time import sleep
 
 
 class Ddo:
 
     mss_required_columns = ['Fail',
                             'Work Order ID',
-                            'Current Pipeline Status',
+                            'Pipeline',
                             'Current Production Status',
                             'Sample Full Name',
                             'Sequencing Scheduled Date',
@@ -30,6 +31,11 @@ class Ddo:
         date = datetime.datetime.now().strftime("%m%d%y")
         hour_min = datetime.datetime.now().strftime("%H%M")
         outfile = 'sequencing_scheduled_ddo.{}.{}.tsv'.format(hour_min, date)
+
+        print('\nEmailing qPCR dropoff report.')
+        subprocess.run(["barcode_info", "--r", "ddo", "--bc-file", self.ddo_bc_file, "--format", "email"])
+
+        print("Generating qpcr dropoff report tsv.\n")
         subprocess.run(
             ["barcode_info", "--r", "ddo", "--bc-file", self.ddo_bc_file, "--format", "tsv", "--output-file-name",
              outfile])
@@ -144,7 +150,7 @@ class Ddo:
                         new_row.cells.append(new_cell)
 
                         new_cell = ss_conn.smart_sheet_client.models.Cell()
-                        new_cell.column_id = sheet_col_ids['Current Pipeline Status']
+                        new_cell.column_id = sheet_col_ids['Pipeline']
                         new_cell.value = pipe
                         new_row.cells.append(new_cell)
 
@@ -197,7 +203,7 @@ class Ddo:
         return False, dup_bc
 
     def pcc_update(self, ss_connector, pcc_sheet_col_dict, barcode_dict, date, status, attachment, failures,
-                   total_samples):
+                   total_samples, fail_infile):
 
         print('\nUpdating Production Communications Sheet with:\n{}'.format('\n'.join(barcode_dict.keys())))
 
@@ -234,6 +240,13 @@ class Ddo:
         # attach spreadsheet
         ss_connector.smart_sheet_client.Attachments.attach_file_to_row(sheet.id, new_title_row_id, (attachment, open(
             attachment, 'rb'), 'application/Excel'))
+
+        # attach fail file
+        if fail_infile:
+            sleep(10)
+            ss_connector.smart_sheet_client.Attachments.attach_file_to_row(sheet.id, new_title_row_id,
+                                                                           (fail_infile, open(
+                                                                               fail_infile, 'rb'), 'application/Excel'))
 
         comment = input('\nDilution Drop Off Comments (Enter to continue without comment):\n')
         # comment = 'Making some comments yo'
