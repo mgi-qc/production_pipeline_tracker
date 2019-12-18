@@ -71,7 +71,7 @@ class plate:
 
     def add_sample(self, sampl):
         if type(sampl) is list:
-            for samp in sample:
+            for samp in sampl:
                 self.samples.append(samp)
                 return None
         else:
@@ -110,7 +110,7 @@ class work_order:
         # Adds sample(s)
 
         if type(sampl) is list:
-            for samp in sample:
+            for samp in sampl:
                 self.samples.append(samp)
                 return None
         else:
@@ -156,55 +156,57 @@ def main():
     TODO: Better output
     TODO: Log failures
     """
+    try:
+        # Change to correct directory
+        orig_dir = os.getcwd()
+        os.chdir('/gscmnt/gc2746/production/smartflow/production_files/library_core/plate_building')
 
-    # Change to correct directory
-    orig_dir = os.getcwd()
-    os.chdir('/gscmnt/gc2746/production/smartflow/production_files/library_core/plate_building')
+        # Get Smaetsheet client
+        ss_client = smrtqc.SmartQC(api_key=os.environ.get('SMRT_API'))
 
-    # Get Smaetsheet client
-    ss_client = smrtqc.SmartQC(api_key=os.environ.get('SMRT_API'))
+        # Import Pipeline file
+        pipe_dict = get_pipelines()
 
-    # Import Pipeline file
-    pipe_dict = get_pipelines()
+        # Import FFPE file
+        FFPE_dict = get_FFPE_names()
 
-    # Import FFPE file
-    FFPE_dict = get_FFPE_names()
+        # get BCS either from Jen
+        barcodes = get_bcs()
 
-    # get BCS either from Jen
-    barcodes = get_bcs()
+        # Queries Dropoff, Freezer Loc, Samples sheet(Possibly)
+        run_queries(barcodes)
 
-    # Queries Dropoff, Freezer Loc, Samples sheet(Possibly)
-    run_queries(barcodes)
+        # Make sample objects
+        sample_master_list = build_sample_objects(pipelines=pipe_dict,bcs=barcodes)
 
-    # Make sample objects
-    sample_master_list = build_sample_objects(pipelines=pipe_dict,bcs=barcodes)
+        # Sort samples to current plates
+        master_current_plates = sort_to_current_plates(sample_master_list)
 
-    # Sort samples to current plates
-    master_current_plates = sort_to_current_plates(sample_master_list)
+        # Mark Samples as FFPE
+        mark_FFPE_samples(sample_master_list, FFPE_dict)
 
-    # Mark Samples as FFPE
-    mark_FFPE_samples(sample_master_list, FFPE_dict)
+        # Sort samples to WOs (Not used...)
+        # wo_master_list = sort_to_work_order(sample_master_list)
 
-    # Sort samples to WOs (Not used...)
-    # wo_master_list = sort_to_work_order(sample_master_list)
+        # Sort samples to outgoing plates
+        outgoing_plates = sort_to_outgoing_plates(plate_list=master_current_plates)
 
-    # Sort samples to outgoing plates
-    outgoing_plates = sort_to_outgoing_plates(plate_list=master_current_plates)
+        # Update SmartSheets
+        update_smart_sheets\
+            (sample_master_list, outgoing_plates, ss_client)
+    finally:
 
-    # Update SmartSheets
-    update_smart_sheets(sample_master_list, outgoing_plates, ss_client)
+        # Update FFPE file
+        update_FFPE_file(FFPE_dict)
 
-    # Update FFPE file
-    update_FFPE_file(FFPE_dict)
+        # Update Pipeline file
+        update_pipeline_file(pipe_dict)
 
-    # Update Pipeline file
-    update_pipeline_file(pipe_dict)
+        # Cleanup
+        clean_up_workspace()
 
-    # Cleanup
-    clean_up_workspace()
-
-    # move back to original dir
-    os.chdir(orig_dir)
+        # move back to original dir
+        os.chdir(orig_dir)
 
 
 def get_pipelines():
@@ -338,7 +340,7 @@ def build_sample_objects(pipelines, bcs):
         next(fin1)
         next(fin2)
 
-        reader1 = csv.DictReader(fin1,delimiter='\t')
+        reader1 = csv.DictReader(fin1, delimiter='\t')
         reader2 = csv.DictReader(fin2, delimiter='\t')
 
         next(reader1)
@@ -373,10 +375,14 @@ def build_sample_objects(pipelines, bcs):
                 # name=bc_samp[line['Barcode']], work_order=line['Outgoing Queue Work Order'], loc=bc_freezer_loc[line['Barcode']], bc=line['Barcode'], pipe=pipe,FFPE=False
                 current_sample = sample()
                 current_sample.work_order = line['Outgoing Queue Work Order']
-                current_sample.pipe =pipe
+                current_sample.pipe = pipe
                 current_sample.source_bc = line['Source BC']
                 current_sample.loc = bc_freezer_loc[line['Barcode']]
-                current_sample.plate = current_sample.loc.split(' ')[-3]
+                try:
+                    current_sample.plate = current_sample.loc.split(' ')[-3]
+                except IndexError:
+                    print('Freezer Location not found, please ensure samples are checked into freezer before running.')
+                    exit(' - Exiting Plate Builder')
                 current_sample.bc = line['Barcode']
                 master_sample_list.append(current_sample)
 
@@ -395,7 +401,7 @@ def get_samp_names(samples):
     bcs = []
     for samp in samples:
         bcs.append(samp.bc)
-    FNULL = open(os.devnull,'w')
+    FNULL = open(os.devnull, 'w')
     subprocess.run(['limfo', 'bar', '-bc', ','.join(bcs), '--report', 'sample_inventory', '--format', 'tsv'], stdout=FNULL, stderr=subprocess.STDOUT)
 
     with open('sample_inventory.tsv') as inv_file:
@@ -406,9 +412,8 @@ def get_samp_names(samples):
 
         for line in reader:
             samples[int(line['#'])-1].name = line['DNA']
-        count = 0
-        for samp in samples:
-            count += 1
+        count = len(samples)
+
         print('   {} samples found.'.format(count))
 
 
@@ -476,7 +481,7 @@ def mark_FFPE_samples(sample_list, FFPE_dict):
             wos.append(samp.work_order)
 
 
-def read_in_wo_inventory(file_name, FFPE_dict,sample_list, wo):
+def read_in_wo_inventory(file_name, FFPE_dict, sample_list, wo):
     """
 
     :param file_name:
@@ -559,7 +564,6 @@ def sort_to_outgoing_plates(plate_list):
 
     # ini lists
     outgoing_plates = []
-    sorting_list = []
 
     # get 96 plates with 1 wo
     presort_bins = get_96_plates(plate_list, outgoing_plates)
@@ -590,7 +594,7 @@ def sort_to_outgoing_plates(plate_list):
     if len(combined_plates) != 0:
         outgoing_plates.extend(combined_plates)
 
-    #rename plates based on work orders and FFPE present
+    # rename plates based on work orders and FFPE present
 
     # Pass list of outgoing plates back to main
     return outgoing_plates
@@ -639,7 +643,6 @@ def bin_presort(plates, outgoing_plates):
                 boxes1[-1].samples.append(samp)
                 boxes1[-1].wo.append(samp.work_order)
                 boxes1[-1].name = samp.plate
-
 
     # Combine plates < 96 that also have same wo; Put plates with 96 into outgoing
     for box1 in boxes1:
@@ -736,26 +739,14 @@ def update_smart_sheets(sample_list, outgoing_plates, ss_client):
 
     # TODO: Make Library Core Space/Folder somewhere that makes sense
     for workspace in workspaces:
-        if workspace.name == 'Production Pipeline':
-            prod_workspace = workspace
+        if workspace.name == 'Library Core Workspace':
+            lib_workspace = ss_client.get_object(workspace.id, 'w')
 
-    prod_folders = ss_client.get_folder_list(prod_workspace.id, 'w')
+    for folder in lib_workspace.folders:
+        if folder.name == 'Plate Sheets':
+            plate_folder = ss_client.get_object(folder.id, 'f')
 
-    for folder in prod_folders:
-        if folder.name == 'OPG':
-            OPG_folder = folder
-
-    OPG_folders = ss_client.get_folder_list(OPG_folder.id, 'f')
-
-    for folder in OPG_folders:
-        if folder.name == 'lib_core':
-            lib_core_folder = folder
-
-    # Temp Setting for lib core folder
-    lib_core_folder = ss_client.get_object(lib_core_folder.id, 'f')
-    #lib_core_folder = ss_client.get_object(7386756749256580, 'f')
-
-    for sheet in lib_core_folder.sheets:
+    for sheet in lib_workspace.sheets:
         if sheet.name == 'plate_assignment_sheet':
             assgn_sheet = sheet
 
@@ -769,7 +760,7 @@ def update_smart_sheets(sample_list, outgoing_plates, ss_client):
         file = build_plate_sheet(plt, sample_list)
 
         imported_sheet = ss_client.smart_sheet_client.Folders.import_csv_sheet(
-            lib_core_folder.id,  # folder_id
+            plate_folder.id,  # folder_id
             file,
             file,  # sheet_name
             header_row_index=0
@@ -866,7 +857,7 @@ def update_PCC(sample_list, ss_client):
     # get PCC sheet
     prod_space = ''
     for wrksp in ss_client.get_workspace_list():
-        if wrksp.name == 'Production Workspace':
+        if wrksp.name == 'Smartflow Production Workspace':
             prod_space = wrksp
     if prod_space == '':
         exit('Production Space not found!')
@@ -874,33 +865,36 @@ def update_PCC(sample_list, ss_client):
     for sheet in ss_client.get_sheet_list(prod_space.id, 'w'):
         if sheet.name == 'Production Communications Center':
             prod_comm_sheet = sheet
+    if not prod_comm_sheet:
+        print('Production Communication Center sheet not found!')
+        print(' - Cannot update Production Communication Center.')
+    else:
+        prod_comm_sheet = ss_client.get_object(prod_comm_sheet.id, 's')
+        col_ids = ss_client.get_column_ids(prod_comm_sheet.id)
 
-    prod_comm_sheet = ss_client.get_object(prod_comm_sheet.id, 's')
-    col_ids = ss_client.get_column_ids(prod_comm_sheet.id)
+        for row in prod_comm_sheet.rows:
+            for cell in row.cells:
+                if cell.value == 'LC dilution drop-off':
+                    lcddo_row = row
 
-    for row in prod_comm_sheet.rows:
-        for cell in row.cells:
-            if cell.value == 'LC dilution drop-off':
-                lcddo_row = row
+        new_row = smartsheet.smartsheet.models.Row()
+        new_row.parent_id = lcddo_row.id
+        new_row.cells.append({'column_id': col_ids['Reporting Instance'], 'value': row_dict['do_name']})
+        new_row.cells.append({'column_id': col_ids['Sequencing Work Order'], 'value': ','.join(row_dict['wo'])})
+        new_row.cells.append({'column_id': col_ids['Items'], 'value': row_dict['no_items']})
+        new_row.cells.append({'column_id': col_ids['Admin Project'], 'value': ','.join(row_dict['admin_proj'])})
+        new_row.cells.append({'column_id': col_ids['Event Date'], 'value': datetime.datetime.now().strftime("%Y-%m-%d")})
 
-    new_row = smartsheet.smartsheet.models.Row()
-    new_row.parent_id = lcddo_row.id
-    new_row.cells.append({'column_id': col_ids['Reporting Instance'], 'value': row_dict['do_name']})
-    new_row.cells.append({'column_id': col_ids['Sequencing Work Order'], 'value': ','.join(row_dict['wo'])})
-    new_row.cells.append({'column_id': col_ids['Items'], 'value': row_dict['no_items']})
-    new_row.cells.append({'column_id': col_ids['Admin Project'], 'value': ','.join(row_dict['admin_proj'])})
-    new_row.cells.append({'column_id': col_ids['Event Date'], 'value': datetime.datetime.now().strftime("%Y-%m-%d")})
+        facil_list = []
 
-    facil_list = []
+        for contact in row_dict['facilitator']:
+            facil_list.append(update_admin_email(ss_client, contact))
 
-    for contact in row_dict['facilitator']:
-        facil_list.append(update_admin_email(ss_client, contact))
+        new_row.cells.append({'column_id': col_ids['Facilitator'], 'object_value': ', '.join(facil_list)})
 
-    new_row.cells.append({'column_id': col_ids['Facilitator'], 'object_value': ', '.join(facil_list)})
+        new_row_response = ss_client.smart_sheet_client.Sheets.add_rows(prod_comm_sheet.id, [new_row]).data[0]
 
-    new_row_response = ss_client.smart_sheet_client.Sheets.add_rows(prod_comm_sheet.id, [new_row]).data[0]
-
-    attached_file = ss_client.smart_sheet_client.Attachments.attach_file_to_row(prod_comm_sheet.id, new_row_response.id, ('dilution_drop_off.tsv', open('dilution_drop_off.tsv'), 'rb'))
+        attached_file = ss_client.smart_sheet_client.Attachments.attach_file_to_row(prod_comm_sheet.id, new_row_response.id, ('dilution_drop_off.tsv', open('dilution_drop_off.tsv'), 'rb'))
 
     for samp in sample_list:
         for admin_proj in admin_wo_samp_dict:
@@ -973,7 +967,6 @@ def build_plate_sheet(out_plate, sample_list):
 def update_MSS_sheets(admin_wo_samp_dict, ss_client):
 
     """
-    TODO: Handle sampels not found in Smartsheet
 
     :param admin_wo_samp_dict: Dictopnary with hierarchy of admin project : work order : sample name
     :param ss_client: smrtqc object with smartsheet client
@@ -990,11 +983,19 @@ def update_MSS_sheets(admin_wo_samp_dict, ss_client):
             num_samples += len(admin_wo_samp_dict[admin][wo])
 
     for space in ss_client.get_workspace_list():
-        if space.name == 'Production Workspace':
+        if space.name == 'Smartflow Production Workspace':
             prod_space = space
 
     for admin in admin_wo_samp_dict:
         for folder in ss_client.get_folder_list(prod_space.id, 'w'):
+            if folder.name == 'Admin Projects':
+                admin_folder = ss_client.get_object(folder.id, 'f')
+
+        for folder in admin_folder.id:
+            if folder.name == 'Active Projects':
+                active_folder = ss_client.get_object(folder.id, 'f')
+
+        for folder in active_folder.folders:
             if admin == folder.name:
                 MSS_folder = folder
 
@@ -1067,7 +1068,7 @@ def update_admin_email(ssclient, facilitator):
     :param facilitator: string of facilitator name or email
     :return: facilitator as Smartsheet object if found
     """
-    user_sheet = ssclient.get_object(2641761152591748, 's')
+    user_sheet = ssclient.get_object(252568824768388, 's')
     sheet_column_dict = ssclient.get_column_ids(user_sheet.id)
     found_user = False
 
