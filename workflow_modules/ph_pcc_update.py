@@ -1,17 +1,16 @@
 import os
+import smartsheet
 from time import sleep
 
 
 class phRowUpdate:
 
+    # TODO: Get rid of rows
     ph_rows_to_initialize = ['Resource Storage',
-                             'Genotyping',
-                             'Genotyping and Illumina Whole Genome Sequencing',
-                             'Technology Development Library Construction and Illumina',
                              'Illumina Whole Genome Sequencing',
                              'IDT Exome Sequencing',
-                             'Analysis',
-                             'Data Import']
+                             'Illumina RNA Sequencing',
+                             'Analysis']
 
     def __init__(self, ph_sheet_object, col_dict, admin_dict, woid):
 
@@ -54,25 +53,29 @@ class phRowUpdate:
         new_row.cells.append({'column_id': self.col_dict['Description'], 'value': self.admin['Description']})
         new_row.cells.append({'column_id': self.col_dict['Date Created'], 'value': self.admin['WO Start Date']})
         new_row.cells.append({'column_id': self.col_dict['WOID Status'], 'value': self.admin['Status']})
-        new_row.cells.append({'column_id': self.col_dict['Facilitator'], 'object_value': self.admin['user email']},)
+        new_row.cells.append({'column_id': self.col_dict['Facilitator'], 'object_value': self.admin['user email']})
         new_row.cells.append({'column_id': self.col_dict['Billing Account'], 'value': self.admin['Billing Account']})
         new_row.cells.append({'column_id': self.col_dict['Accounts Payable Contact'], 'value': 'NHGRI'})
 
         new_row.to_bottom = True
         new_row.parent_id = row_id
 
-        print('Appending {} to {} Resource Work Order field.'.format(self.woid, self.admin['Administration Project']))
+        print('Appending {} to {}:\n{}'.format(self.woid, self.admin['Administration Project'], self.admin['Pipeline']))
 
-        response = ss_connector.smart_sheet_client.Sheets.add_rows(self.sheet.id, [new_row]).data
+        # response = ss_connector.smart_sheet_client.Sheets.add_rows(self.sheet.id, [new_row]).data
+        # Make new connection to get updated workspace, prevent 'Parent row id not found error'
+        new_ss_connector = smartsheet.Smartsheet(os.environ.get('SMRT_API'))
+        response = new_ss_connector.Sheets.add_rows(self.sheet.id, [new_row]).data
 
         for r in response:
             new_row_id = r.id
 
         if os.path.isfile(attachment):
             sleep(2)
-            ss_connector.smart_sheet_client.Attachments.attach_file_to_row(
-                self.sheet.id, new_row_id, (attachment, open(attachment, 'rb'), 'application/Excel'))
-            sleep(10)
+            # ss_connector.smart_sheet_client.Attachments.attach_file_to_row(
+            #     self.sheet.id, new_row_id, (attachment, open(attachment, 'rb'), 'application/Excel'))
+            new_ss_connector.Attachments.attach_file_to_row(self.sheet.id, new_row_id,
+                                                            (attachment, open(attachment, 'rb'), 'application/Excel'))
         return
 
     def ph_update(self, ss_connector):
@@ -110,7 +113,21 @@ class phRowUpdate:
                 new_rwo_header_row_number = r.id
 
             # use write_row function to populate rwo row with fields and write
-            return self.write_row(ss_connector, new_rwo_header_row_number)
+            attempts = 0
+            while attempts < 3:
+                try:
+                    self.write_row(ss_connector, new_rwo_header_row_number)
+                except ss_connector.exceptions.SmartsheetException as e:
+                    if isinstance(e, ss_connector.exceptions.ApiError):
+                        print(e.error.result.error_code)
+                        print(e.error.result.message)
+                        print(e.error.result.name)
+                        print(e.error.result.recommendation)
+                else:
+                    break
+
+            sleep(5)
+            return
 
         if not admin_found:
 
@@ -150,7 +167,20 @@ class phRowUpdate:
 
                 title_row_add_list.append(new_header_row)
 
-            response = ss_connector.smart_sheet_client.Sheets.add_rows(self.sheet.id, title_row_add_list)
+            attempts = 0
+            while attempts < 3:
+                try:
+                    response = ss_connector.smart_sheet_client.Sheets.add_rows(self.sheet.id, title_row_add_list)
+                    attempts += 1
+                except ss_connector.exceptions.SmartsheetException as e:
+                    if isinstance(e, ss_connector.exceptions.ApiError):
+                        print(e.error.result.error_code)
+                        print(e.error.result.message)
+                        print(e.error.result.name)
+                        print(e.error.result.recommendation)
+
+                else:
+                    break
 
             for r in response.data:
                 for cell in r.cells:
@@ -177,8 +207,11 @@ class phRowUpdate:
                              'url': 'https://imp-lims.ris.wustl.edu/entity/administration-project/?project_name={}'
                             .format(self.admin['Administration Project'].replace(' ', '+'))}})
 
-                    new_rba_row.cells.append({'column_id': self.col_dict['Facilitator'],
-                                              'object_value': self.admin['user email']})
+                    # new_rba_row.cells.append({'column_id': self.col_dict['Facilitator'],
+                    #                           'object_value': self.admin['user email']})
+                    new_rba_row.cells.append({'column_id': self.col_dict['Facilitator'], 'object_value': {
+                        "objectType": 'MULTI_CONTACT', 'values': [{'email': self.admin['user email'],
+                                                                   'name': self.admin['user email']}]}})
                     new_rba_row.cells.append(
                         {'column_id': self.col_dict['Event Date'], 'value': self.admin['WO Start Date']})
                     new_rba_row.cells.append({'column_id': self.col_dict['Items'], 'value': 0})

@@ -2,6 +2,7 @@ import csv
 import os
 import datetime
 import subprocess
+from time import sleep
 
 
 class SequencingUpdate:
@@ -18,9 +19,12 @@ class SequencingUpdate:
         date = datetime.datetime.now().strftime("%m%d%y")
         hour_min = datetime.datetime.now().strftime("%H%M")
         outfile_temp = 'illumina_info_temp.tsv'
-        outfile = 'library_index_summary.totalkb.pass.{}.{}.tsv'.format(hour_min, date)
+        illumina_file = 'library_index_summary.totalkb.{}.{}.tsv'.format(hour_min, date)
+        pass_file = 'library_index_summary.totalkb.pass.{}.{}.tsv'.format(hour_min, date)
         failed_file = 'library_index_summary.totalkb.fail.{}.{}.tsv'.format(hour_min, date)
         woid_arg = '--woid={}'.format(woid)
+
+        attachment_files = []
 
         subprocess.run(
             ['illumina_info', '-report', 'library_index_summary', '--format', 'tsv', woid_arg, '--incomplete',
@@ -28,17 +32,17 @@ class SequencingUpdate:
 
         if not os.path.isfile(outfile_temp):
             print('illumina_info failed to create {} file'.format(outfile))
-            return False, False
+            return False, False, False
 
-        with open(outfile_temp, 'r') as f, open(outfile, 'w') as o:
+        with open(outfile_temp, 'r') as f, open(illumina_file, 'w') as o:
 
             for line in f:
                 if line and '--' not in line and 'Library Index Summary' not in line:
                     o.write(line)
 
         os.remove(outfile_temp)
-
-        with open(outfile, 'r') as f, open(failed_file, 'w') as fail, open(outfile_temp, 'w') as oft:
+        attachment_files.append(illumina_file)
+        with open(illumina_file, 'r') as f, open(failed_file, 'w') as fail, open(pass_file, 'w') as oft:
             fh = csv.DictReader(f, delimiter='\t')
             temp_writer = csv.DictWriter(oft, fieldnames=fh.fieldnames, delimiter='\t')
             temp_writer.writeheader()
@@ -47,11 +51,13 @@ class SequencingUpdate:
 
             data = {}
             fails_found = False
+            pass_found = False
             failed_samples_report = []
             failed_samples = []
 
             for line in fh:
                 if float(line['Total Bases Kb (PF)'].replace(',', '')) >= cutoff:
+                    pass_found = True
                     data[line['Library'].split('-lib')[0]] = line
                     temp_writer.writerow(line)
                 else:
@@ -60,36 +66,37 @@ class SequencingUpdate:
                     failed_samples.append(line['Library'].split('-lib')[0])
                     failed_samples_report.append('{}\t{}'.format(line['Library'].split('-lib')[0],
                                                                  line['Total Bases Kb (PF)']))
-
-        os.replace(outfile_temp, outfile)
+        if pass_found:
+            attachment_files.append(pass_file)
 
         if fails_found:
+            attachment_files.append(failed_file)
             print('Samples failed to meet total bases threshold: {}'.format(len(failed_samples_report)))
             print('\n'.join(failed_samples_report))
-            print('\nFailed sample file: {}'.format(failed_file))
 
         else:
-            print('No samples failed to meet total bases threshold.')
+            print('\nNo samples failed to meet total bases threshold.')
             os.remove(failed_file)
 
-        print('Report outfile: {}\n'.format(outfile))
+        print('\nillumina_info report files:\n{}'.format('\n'.join(attachment_files)))
 
-        return data, outfile, failed_samples
+        return data, attachment_files, failed_samples
 
     def update_mss_sheet(self, ss_conn, admin_info, sample_data, sheet_info_dict, failed_samples):
 
         total_samples = len(sample_data)
-        print('Sequence complete samples from illumina_info report: {}'.format(total_samples))
+        print('\nSequence complete samples from illumina_info report: {}'.format(total_samples))
         total_updated_samples = 0
         total_existing_seq_complete_samples = 0
         update_sample_name = []
         seq_complete_samples = []
-
+        attachment_files = []
         for folder, sheet_info in sheet_info_dict.items():
 
             date = datetime.datetime.now().strftime("%m%d%y")
             outfile = '{}.sequence.scheduled.all.{}.tsv'.format(admin_info['Work Order ID'], date)
             outfile_new_samples = '{}.sequence.scheduled.new.{}.tsv'.format(admin_info['Work Order ID'], date)
+            attachment_files.extend([outfile, outfile_new_samples])
             with open(outfile, 'w') as f, open(outfile_new_samples, 'w') as o_new:
 
                 outfile_header = ['Work Order ID', 'Sample Full Name', 'Pipeline', 'Current Production Status',
@@ -135,8 +142,9 @@ class SequencingUpdate:
                             if cell.column_id == sheet_col_ids['Sample Full Name']:
                                 sample_name = cell.value
                                 sample_data_dict['Sample Full Name'] = sample_name
-                                if sample_name in sample_data.keys():
-                                    sample_found = True
+                                for sample in sample_data.keys():
+                                    if sample_name in sample:
+                                        sample_found = True
 
                             if cell.column_id == sheet_col_ids['Current Production Status']:
                                 sample_production_status = cell.value
@@ -201,10 +209,25 @@ class SequencingUpdate:
                     total_updated_samples += updated_samples
 
             print('\nFailed to update samples:')
+            # for sample in sample_data:
+            #     if sample not in update_sample_name and sample not in seq_complete_samples:
+            #         print(sample)
+            # return total_updated_samples
+
             for sample in sample_data:
-                if sample not in update_sample_name and sample not in seq_complete_samples:
+                update_found = False
+                seq_update = False
+                for update_sample in update_sample_name:
+                    if update_sample in sample:
+                        update_found = True
+
+                for seq_complete_sample in seq_complete_samples:
+                    if seq_complete_sample in sample:
+                        seq_update = True
+                if not update_found and not seq_update:
                     print(sample)
-            return total_updated_samples
+
+            return total_updated_samples, attachment_files
 
     def pcc_find_sibling_id(self, pccs, woid, admin_project):
 
@@ -258,8 +281,10 @@ class SequencingUpdate:
             {'column_id': col_dict['Admin Project'], 'value': admin_info['Administration Project'], 'hyperlink': {
                 'url': 'https://imp-lims.ris.wustl.edu/entity/administration-project/?project_name={}'.format(
                     admin_info['Administration Project'].replace(' ', '+'))}})
-        new_swo_row.cells.append(
-            {'column_id': col_dict['Facilitator'], 'object_value': admin_info['user email']})
+        # new_swo_row.cells.append({'column_id': col_dict['Facilitator'], 'object_value': admin_info['user email']})
+        new_swo_row.cells.append({'column_id': col_dict['Facilitator'], 'object_value': {
+                        "objectType": 'MULTI_CONTACT', 'values': [{'email': admin_info['user email'],
+                                                                   'name': admin_info['user email']}]}})
         new_swo_row.cells.append({'column_id': col_dict['Event Date'], 'value': datetime.datetime.now().isoformat()})
         new_swo_row.cells.append({'column_id': col_dict['Production Notes'], 'value': admin_info['Description']})
 
@@ -276,11 +301,16 @@ class SequencingUpdate:
             new_title_row_id = r.id
 
         # attach spreadsheet
-        ss_connector.smart_sheet_client.Attachments.attach_file_to_row(sheet.id, new_title_row_id, (attachment, open(
-            attachment, 'rb'), 'application/Excel'))
+        for file in attachment:
+            file_line_number = sum(1 for line in open(file))
+            if file_line_number > 1:
+                ss_connector.smart_sheet_client.Attachments.attach_file_to_row(sheet.id, new_title_row_id,
+                                                                               (file, open(file, 'rb'),
+                                                                                'application/Excel'))
+            sleep(5)
 
-        comment = input('\nDilution Drop Off Comments (Enter to continue without comment):\n')
-        # comment = 'Making some comments yo'
+        comment = input('\nSequence Complete Comments (Enter to continue without comment):\n')
+
         if comment:
             ss_connector.smart_sheet_client.Discussions.create_discussion_on_row(sheet.id, new_title_row_id,
                                                                                  ss_connector.smart_sheet_client.models.

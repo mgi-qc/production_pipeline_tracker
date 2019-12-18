@@ -96,13 +96,13 @@ class Ddo:
 
     def sample_update(self, ss_conn, sample_sheet_dict, woids, pipe, samples, date, status, fails):
 
-        samples_to_update = len(samples)
         woid_fail_sample_count = {}
 
         date_column_name = 'Sequencing Scheduled Date'
         if 'Initial' in status:
             date_column_name = 'Initial Sequencing Scheduled Date'
 
+        updated_sample_count = 0
         for sheet_info in sample_sheet_dict.values():
             for sheet_name, id_ in sorted(sheet_info.items()):
 
@@ -187,12 +187,10 @@ class Ddo:
                         fail.append('Fail: {} {}'.format(rw, rs))
 
                 update = ss_conn.smart_sheet_client.Sheets.update_rows(mss_sheet.id, updated_rows)
-                samples_to_update = samples_to_update - len(match)
-                print('Total number of samples to update: {}'.format(len(samples)))
                 print('Updated Samples: {}'.format(len(match)))
-                print('Remaining samples to update: {}'.format(samples_to_update))
-                # print('\n'.join(fail))
-            return woid_fail_sample_count
+                updated_sample_count += len(match)
+
+            return woid_fail_sample_count, updated_sample_count
 
     def dup_pcc_bc_check(self, pcc_sheet_col_dict, barcode_dict):
         dup_bc = ''
@@ -268,8 +266,10 @@ class Ddo:
             new_bc_row.cells.append({'column_id': col_dict['Items'], 'value': barcode_dict[bc]['items']})
             new_bc_row.cells.append({'column_id': col_dict['Admin Project'],
                                      'value': ','.join(barcode_dict[bc]['admin']), 'format': ",,,,,,,,,,,,,,,1,"})
-            new_bc_row.cells.append({'column_id': col_dict['Facilitator'],
-                                     'object_value': barcode_dict[bc]['facilitator']})
+            # new_bc_row.cells.append({'column_id': col_dict['Facilitator'],
+            #                          'object_value': barcode_dict[bc]['facilitator']})
+            new_bc_row.cells.append({'column_id': col_dict['Facilitator'], 'objectValue': {
+                                     'objectType': 'MULTI_CONTACT', 'values': barcode_dict[bc]['user email']}})
             new_bc_row.cells.append({'column_id': col_dict['Event Date'], 'value': date})
             new_bc_row.cells.append({'column_id': col_dict['instrument/sequencing platform'],
                                      'value': sequencing_platform})

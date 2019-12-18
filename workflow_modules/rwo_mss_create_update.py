@@ -21,15 +21,14 @@ class sampleUpdate:
                           'Billing Acct Name',
                           'Administration Project',
                           'Facilitator Comment',
-                          'Is For CLE?',
-                          'Topup']
+                          'Is For CLE?']
 
     date_columns = ['RWOID Creation Date',
                     'WOID Creation Date',
                     'Resource Assessment Completed Date',
                     'Lib Core Start Date',
-                    'qPCR drop off date',
                     'Capture drop off date',
+                    'qPCR drop off date',
                     'Initial Sequencing Scheduled Date',
                     'Sequencing Scheduled Date',
                     'Sequencing Completed Date',
@@ -52,17 +51,14 @@ class sampleUpdate:
                                 'WO Facilitator': admin['Facilitator'],
                                 'Billing Acct Name': admin['Billing Account'],
                                 'Facilitator Comment': admin['Facilitator Comment'],
-                                'Is For CLE?': admin['Is For CLE?']}
+                                'Is For CLE?': admin['Is For CLE?'],
+                                'user email': admin['user email']}
 
         self.rwo = False
         self.swo = True
         if 'Resource Storage' in self.pipeline:
             self.rwo = True
             self.swo = False
-
-        # self.swo = False
-        # if 'sequencing' in self.pipeline.lower():
-        #     self.swo = True
 
     def construct_sheet(self, sheet_name, *args):
 
@@ -78,11 +74,16 @@ class sampleUpdate:
         for col in self.new_column_headers:
             if col == 'Sample Full Name':
                 new_sheet['columns'].append({'title': col, 'type': 'TEXT_NUMBER', 'primary': True})
+            elif col == 'WO Facilitator':
+                new_sheet['columns'].append({'title': col, 'type': 'CONTACT_LIST'})
             else:
                 new_sheet['columns'].append({'title': col, 'type': 'TEXT_NUMBER'})
 
         for date_col in self.date_columns:
             new_sheet['columns'].append({'title': date_col, 'type': 'DATE'})
+
+        new_sheet['columns'].append({'title': 'Topup', 'type': 'CHECKBOX', 'width': 60})
+        new_sheet['columns'].append({'title': 'Launched', 'type': 'CHECKBOX', 'width': 60})
 
         sheet_spec = self.ss_connector.smart_sheet_client.models.Sheet(new_sheet)
 
@@ -146,6 +147,11 @@ class sampleUpdate:
 
             if header == 'Administration Project':
                 new_row.cells.append({'column_id': sheet_columns['Administration Project'], 'value': self.admin})
+                continue
+
+            if header == 'WO Facilitator':
+                new_row.cells.append({'column_id': sheet_columns['WO Facilitator'],
+                                      'value': self.admin_info_dict['user email']})
                 continue
 
             if header == 'RWOID Description' and self.rwo:

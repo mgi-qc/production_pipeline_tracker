@@ -17,6 +17,7 @@ import workflow_modules.woInfo as woInfo
 import workflow_modules.dilution_drop_off as ddo
 import workflow_modules.sequence_complete as sequence_complete
 
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-w', help='Input woid', type=str)
 parser.add_argument('-f', help='Input file', type=str)
@@ -43,8 +44,10 @@ def get_column_ids(sheet_column_object):
 def get_project_hub(ssclient):
 
     # production workspace
+    op_hub_space = False
     for space in ssclient.get_workspace_list():
         if space.name == 'Smartflow Production Workspace':
+        # if space.name == 'Workspace population':
             op_hub_space = space
 
     if not op_hub_space:
@@ -69,9 +72,11 @@ def get_sample_sheet(ssclient, admin, update=None):
 
     folder_exist = False
     sheet_exists = False
+    op_hub_space = False
     active_project_id = ''
     for space in ssclient.get_workspace_list():
         if space.name == 'Smartflow Production Workspace':
+        # if space.name == 'Workspace population':
             op_hub_space = space
 
     if not op_hub_space:
@@ -180,12 +185,16 @@ if args.w:
 def main():
 
     if (args.f or args.w) and (args.add or args.update or args.s):
-
+        count = 0
         for woid in woids:
             print('\n**********\nStarting update on {}:\n'.format(woid))
-            sleep(15)
+            # sleep(15)
 
             if args.add:
+
+                count += 1
+                if (count % 10) == 0:
+                    sleep(30)
 
                 w = woInfo.woInfo(woid)
 
@@ -208,6 +217,7 @@ def main():
 
                 # init smartsheet connection
                 s = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+
                 admin_info['user email'] = update_admin_email(s, admin_info['Facilitator'])
 
                 # get project hub, production communication sheets
@@ -354,11 +364,13 @@ def main():
                 if args.tkb:
                     total_kb_cutoff = args.tkb
 
-                sample_data, outfile, failed_samples = i.illumina_info(woid=woid, cutoff=total_kb_cutoff)
+                sample_data, outfiles, failed_samples = i.illumina_info(woid=woid, cutoff=total_kb_cutoff)
 
                 if not sample_data:
+                    print('illumina_info query failed to return samples.')
                     continue
-                print('{} Samples from illumina_info sequence complete'.format(len(sample_data)))
+
+                print('\n{} Samples from illumina_info sequence complete'.format(len(sample_data)))
 
                 # get admin info
                 w = woInfo.woInfo(woid)
@@ -369,18 +381,31 @@ def main():
                     print('{}: {}'.format(k, v))
 
                 # init smartsheet connection
-                print('\nUpdating MSS sheets:\n')
+                print('\nUpdating MSS sheets:')
                 # get mss sheets
                 s = smrtqc.SmartQC(os.environ.get('SMRT_API'))
                 admin_info['user email'] = update_admin_email(s, admin_info['Facilitator'])
                 smartsheet_mss_sample_sheets = get_sample_sheet(s, admin_info['Administration Project'], update=True)
-                updated_sample_num = i.update_mss_sheet(ss_conn=s, admin_info=admin_info, sample_data=sample_data,
-                                                        sheet_info_dict=smartsheet_mss_sample_sheets,
-                                                        failed_samples=failed_samples)
+                updated_sample_num, attachments = i.update_mss_sheet(ss_conn=s, admin_info=admin_info,
+                                                                     sample_data=sample_data,
+                                                                     sheet_info_dict=smartsheet_mss_sample_sheets,
+                                                                     failed_samples=failed_samples)
 
+                upload_files = []
+                for file in outfiles + attachments:
+                    f_line_number = sum(1 for line in open(file))
+                    if f_line_number == 1:
+                        os.remove(file)
+                    else:
+                        upload_files.append(file)
+
+                # exit()
                 i.pcc_update(ss_connector=pcc, pccs=pccs, woid=woid, admin_info=admin_info,
-                             sample_number=updated_sample_num, attachment=outfile)
+                             sample_number=updated_sample_num, attachment=upload_files)
 
+                for file in upload_files:
+                    move('{}/{}'.format(os.getcwd(), file),
+                         '/gscmnt/gc2746/production/smartflow/production_files/sequence_complete/{}'.format(file))
                 print('illumina_info process status: {} samples Sequence Complete'.format(updated_sample_num))
 
     if args.ss:
@@ -431,6 +456,7 @@ def main():
 
         print('\nWork Order Billing Information:')
         project_folders = set()
+        updated_samples = 0
         for wo in ddo_woids:
 
             # query woid for admin info
@@ -440,10 +466,15 @@ def main():
             admin_info = w.get_admin()
 
             # turned off because multiple facilitators
-            # for bc in bc_dict:
-            #     bc_dict[bc]['user email'] = update_admin_email(pcc, admin_info['Facilitator'])
-            #     if wo in bc_dict[bc]['woids']:
-            #         bc_dict[bc]['admin'].add(admin_info['Administration Project'])
+            for bc in bc_dict:
+                # contact1 = {"email": "awollam@wustl.edu", "name": "Aye Wollam"}
+                # "objectValue": {"objectType": "MULTI_CONTACT", "values": [contact1,contact2]}}]
+                # bc_dict[bc]['user email'] = update_admin_email(pcc, admin_info['Facilitator'])
+                bc_dict[bc]['user email'] = [{'email': update_admin_email(pcc, email), 'name': email}
+                                             for email in bc_dict[bc]['facilitator'].split(',')]
+
+                if wo in bc_dict[bc]['woids']:
+                    bc_dict[bc]['admin'].add(admin_info['Administration Project'])
 
             # get folders
             project_folders.add(admin_info['Administration Project'])
@@ -471,10 +502,11 @@ def main():
                 continue
 
             # update samples
-            pcc_fails = d.sample_update(ss_conn=s, sample_sheet_dict=smartsheet_mss_sample_sheets, woids=ddo_woids,
-                                        pipe=admin_info['Pipeline'], samples=ddo_samples, date=ddo_date,
-                                        status=ddo_update_status, fails=failed_samples)
+            pcc_fails, samp_updated = d.sample_update(ss_conn=s, sample_sheet_dict=smartsheet_mss_sample_sheets,
+                                                      woids=ddo_woids, pipe=admin_info['Pipeline'], samples=ddo_samples,
+                                                      date=ddo_date, status=ddo_update_status, fails=failed_samples)
 
+            updated_samples += samp_updated
             # turned off adding fails to barcode, needs updating if it's going to be used.
             # pcc = smrtqc.SmartQC(os.environ.get('SMRT_API'))
             #
@@ -484,8 +516,10 @@ def main():
 
         if os.path.exists(sample_file):
             move('{}/{}'.format(os.getcwd(), sample_file),
-                 '/gscmnt/gc2746/production/smartflow/production_files/sequence_complete/{}'.format(sample_file))
+                 '/gscmnt/gc2746/production/smartflow/production_files/sequencing_scheduled/{}'.format(sample_file))
 
+        print('\nSamples found to update: {}'.format(len(ddo_samples)))
+        print('Samples updated: {}'.format(updated_samples))
         print('\nDilution Drop Off Complete\n')
 
     if args.qpcr:
