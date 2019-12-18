@@ -17,6 +17,13 @@ import smrtqc
 
 # Misc Functions
 def is_num(s):
+    """
+    Returns True if object can be cast as an int, False if not
+
+    :param s: any object 's'
+    :return: bool
+    """
+
     try:
         float(s)
     except ValueError:
@@ -26,13 +33,20 @@ def is_num(s):
 
 def get_wo_id():
     """
+    Input Resource Bank Work Order ID for assessment: has digit checks
 
     :return: wo_in : work order entered in by user
     """
+
+    # Input prompt
     print('Please enter the Resource Bank work order id: ')
     try_count = 0
+
+    # Capture/recapture and check input
     while True:
+
         wo_in = input()
+
         if len(wo_in) != 7:
             print('Work orders must be 7 digits long')
         elif not is_num(wo_in):
@@ -47,16 +61,27 @@ def get_wo_id():
 
 def get_total_dna_needed():
     """
-
+    TODO: Get min dna req and standard req
     :return: total_in : total dna required for resource work order
     """
-    print('Please enter the amount of dna needed for the sample to pass(in ng): ')
+    print('Please enter the minimum amount of dna needed for the sample to pass(in ng): ')
 
     while True:
-        total_in = input()
+        min_in = input()
 
-        if is_num(total_in) and float(total_in) > 0:
-            return float(total_in)
+        if is_num(min_in) and float(min_in) > 0:
+            min_req = float(min_in)
+            break
+        else:
+            print('Please enter a positive number: ')
+
+    print('Please enter the standard amount of dna needed for the sample to pass(in ng): ')
+
+    while True:
+        std_in = input()
+
+        if is_num(std_in) and float(std_in) > 0:
+            std_req = float(std_in)
         else:
             print('Please enter a positive number: ')
 
@@ -103,6 +128,7 @@ def get_project_name(inventory_file):
 
 def check_dna(total_dna, req_dna):
     """
+    TODO: Check both std and min req dna
 
     :param total_dna: total dna assessed
     :param req_dna: dna required for pass
@@ -119,9 +145,11 @@ def check_dna(total_dna, req_dna):
 
 def get_sample_row_sheet(line_dict, sample_sheets, wo):
     """
+
     returns row, sheet and column ids if sample in line is found, else returns 0,0,0
     :param line_dict: line from dict reader
     :param sample_sheets: list of sample sheets to be searched
+    :param wo: work order associated with sample
     :return: row, sheet, and column ids
     """
     for sheet in sample_sheets:
@@ -216,6 +244,11 @@ def add_comment_to_PCC(prod_space, woid, ss_connector):
 
 
 def main():
+    """
+    TODO: Make directory and workspace routing centralized to smartflow/smrtqc
+    TODO: Build report from template provided
+    TODO: Mark failed samples in smartsheet to kick off workflow
+    """
 
     # Initialize smrtqc object
     ss_client = smrtqc.SmartQC(api_key=os.environ.get('SMRT_API'))
@@ -248,7 +281,7 @@ def main():
 
     # get sample sheets using project name
     for space in ss_client.get_workspace_list():
-        if space.name == 'New Production Workspace':
+        if space.name == 'Smartflow Production Workspace':
             op_space = ss_client.get_object(space.id, 'w')
 
     # get projects folder
@@ -290,6 +323,7 @@ def main():
 
         date = datetime.now().strftime('%Y-%m-%d')
 
+        # iterate over samples, assess pass/fails, and load results into smartsheet
         for line in reader:
 
             row, sheet, column_ids = get_sample_row_sheet(line, sample_sheets, woid)
