@@ -58,6 +58,7 @@ def load_dropoff_into_smartsheet(dropoff_sheet, wo_sheet, info, smartsheet_obj, 
     # Build new cells for
     new_row = smartsheet.smartsheet.models.Row()
     new_row.parent_id = header_row.id
+    new_row.to_bottom = True
     new_row.cells.append({'column_id': column_ids['Reporting Instance'], 'value': info['Title']})
     new_row.cells.append({'column_id': column_ids['Sequencing Work Order'], 'value': ', '.join(info['Outgoing Queue Work Order'])})
     new_row.cells.append({'column_id': column_ids['Admin Project'], 'value': ', '.join(info['Administration Project'])})
