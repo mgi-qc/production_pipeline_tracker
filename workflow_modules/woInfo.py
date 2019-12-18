@@ -35,34 +35,34 @@ class woInfo:
 
             for line in admin_collections:
 
-                if 'Administration Project' in line:
+                if 'Administration Project:' in line:
                     admin_query_dict['Administration Project'] = str(line.split(':')[1].strip())
 
-                if 'Pipeline' in line:
+                if 'Pipeline:' in line:
                     admin_query_dict['Pipeline'] = str(line.split(':')[1].strip())
 
-                if 'Description' in line:
+                if 'Description:' in line:
                     admin_query_dict['Description'] = str(line.split(':')[1].strip())
 
-                if 'Status' in line:
+                if 'Status:' in line:
                     admin_query_dict['Status'] = str(line.split(':')[1].strip())
 
-                if 'WO Facilitator' in line:
+                if 'WO Facilitator:' in line:
                     admin_query_dict['Facilitator'] = str(line.split(':')[1].strip())
 
-                if 'Billing Acct Name' in line:
+                if 'Billing Acct Name:' in line:
                     admin_query_dict['Billing Account'] = str(line.split(':')[1].strip())
 
-                if 'WO Start Date' in line:
+                if 'WO Start Date:' in line:
                     admin_query_dict['WO Start Date'] = str(line.split(':')[1].strip())
 
-                if 'Creator' in line:
+                if 'Creator:' in line:
                     admin_query_dict['Creator'] = str(line.split(':')[1].strip())
 
-                if 'Facilitator Comment' in line:
+                if 'Facilitator Comment:' in line:
                     admin_query_dict['Facilitator Comment'] = str(line.split(':')[1].strip())
 
-                if 'Is For CLE?' in line:
+                if 'Is For CLE?:' in line:
                     admin_query_dict['Is For CLE?'] = str(line.split(':')[1].strip())
 
         return admin_query_dict
