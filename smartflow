@@ -422,6 +422,10 @@ def main():
         failed_samples = {}
 
         if args.sf:
+
+            if not os.path.isfile(args.sf):
+                sys.exit('{} file not found'.format(args.sf))
+
             with open(args.sf, 'r') as fh:
                 file_dict = csv.DictReader(fh, delimiter='\t')
                 for l in file_dict:

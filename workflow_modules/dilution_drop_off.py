@@ -1,3 +1,5 @@
+import os
+import sys
 import csv
 import subprocess
 import datetime
@@ -39,6 +41,7 @@ class Ddo:
         subprocess.run(
             ["barcode_info", "--r", "ddo", "--bc-file", self.ddo_bc_file, "--format", "tsv", "--output-file-name",
              outfile])
+
         return outfile
 
     def get_samples(self, barcode_list):
@@ -47,8 +50,12 @@ class Ddo:
         date = datetime.datetime.now().strftime("%m%d%y")
         hour_min = datetime.datetime.now().strftime("%H%M")
         outfile = 'sequencing_sample_inventory_ddo.{}.{}.tsv'.format(hour_min, date)
+
         subprocess.run(['barcode_info', '--report', 'sample_inventory', '--bc', ','.join(barcode_list),
                         '--format', 'tsv', "--output-file-name", outfile])
+
+        if not os.path.isfile(outfile):
+            sys.exit('{} sample file not found'.format(outfile))
 
         with open(outfile, 'r') as f:
             next(f)
@@ -62,7 +69,6 @@ class Ddo:
 
     def get_woids(self, infile):
 
-        # sample_data = {}
         bc_dict_data = {}
         header_line = False
         woids = list()
@@ -79,8 +85,11 @@ class Ddo:
                 if '#' in line and not header_line:
                     header_line = True
                     header = line
+                    continue
 
-                if len(line) > 1 and 'Sources' in line[1] and header_line:
+                # updated header line processing
+                # if len(line) > 1 and 'Sources' in line[1] and header_line:
+                if len(line) > 1 and header_line and '-' not in line[0]:
                     line_dict = {k: v for k, v in zip(header, line)}
                     bc_dict_data[line_dict['Barcode']] = {'items': line_dict['Index'].split()[0], 'admin': set(),
                                                           'woids': line_dict['Outgoing Queue Work Order'].split(','),
@@ -91,6 +100,9 @@ class Ddo:
 
                     woid_list = line_dict['Outgoing Queue Work Order'].split(',')
                     woids.extend(woid_list)
+
+                if len(line) == 1 and 'Parents' in line[0]:
+                    return list(set(woids)), bc_dict_data
 
         return list(set(woids)), bc_dict_data
 
