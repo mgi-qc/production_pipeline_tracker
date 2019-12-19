@@ -454,9 +454,10 @@ def main():
         # get project hub, production communication sheets
         ph, pccs = get_project_hub(pcc)
 
-        pcc_duplicate_test, dup_bc = d.dup_pcc_bc_check(pccs, bc_dict)
-        if pcc_duplicate_test:
-            sys.exit('\n{} barcode already exists in Production Communciations Hub.\n'.format(dup_bc))
+        # barcode can be used multiple times, turned off duplicate checking
+        # pcc_duplicate_test, dup_bc = d.dup_pcc_bc_check(pccs, bc_dict)
+        # if pcc_duplicate_test:
+        #     sys.exit('\n{} barcode already exists in Production Communciations Hub.\n'.format(dup_bc))
 
         print('\nWork Order Billing Information:')
         project_folders = set()

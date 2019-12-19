@@ -185,7 +185,8 @@ class Ddo:
                             new_cell = ss_conn.smart_sheet_client.models.Cell()
                             new_cell.column_id = sheet_col_ids['Current Production Status']
                             new_cell.value = 'qPCR Failed'
-                            new_cell.format_ = ",,,,,,,,,27,,,,,,"
+                            # turned off red cell color
+                            # new_cell.format_ = ",,,,,,,,,27,,,,,,"
                             new_row.cells.append(new_cell)
 
                         if not failed_status:
