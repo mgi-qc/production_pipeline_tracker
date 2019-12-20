@@ -318,7 +318,11 @@ def main():
                     print('\nSkipping {}, resource work order exists in Project Hub.'.format(woid))
                     continue
 
-                p_update = ph_update.ph_update(s)
+                p_update = ph_update.ph_update(s, update=True)
+
+                if not p_update:
+                    print('\nAdmin project not found in Project Hub, please add project samples to update.')
+                    continue
 
                 if not sample_data:
                     print('{} wo_info returned no samples.'.format(woid))

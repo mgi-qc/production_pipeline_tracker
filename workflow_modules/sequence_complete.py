@@ -26,12 +26,14 @@ class SequencingUpdate:
 
         attachment_files = []
 
+        subprocess.run(['illumina_info', '-report', 'library_index_summary', '--format', 'email', woid_arg,
+                        '--incomplete'])
         subprocess.run(
             ['illumina_info', '-report', 'library_index_summary', '--format', 'tsv', woid_arg, '--incomplete',
              '--output-file-name', outfile_temp])
 
         if not os.path.isfile(outfile_temp):
-            print('illumina_info failed to create {} file'.format(outfile))
+            print('illumina_info failed to create {} file'.format(outfile_temp))
             return False, False, False
 
         with open(outfile_temp, 'r') as f, open(illumina_file, 'w') as o:
