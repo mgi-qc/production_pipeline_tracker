@@ -78,7 +78,7 @@ class phRowUpdate:
                                                             (attachment, open(attachment, 'rb'), 'application/Excel'))
         return
 
-    def ph_update(self, ss_connector):
+    def ph_update(self, ss_connector, update=None):
 
         admin_found = False
         pipeline_row_found = False
@@ -96,7 +96,8 @@ class phRowUpdate:
 
                 # if admin_found and rwo_row_number == row.row_number and cell.value == 'Resource Storage':
                 if admin_found and cell.value == self.admin['Pipeline']:
-                    return self.write_row(ss_connector, row.id)
+                    self.write_row(ss_connector, row.id)
+                    return True
 
         if admin_found and not pipeline_row_found:
             new_rwo_header_row = ss_connector.smart_sheet_client.models.Row({"format": ",,1,,,,,,,18,,,,,,"})
@@ -127,7 +128,10 @@ class phRowUpdate:
                     break
 
             sleep(5)
-            return
+            return True
+
+        if not admin_found and update:
+            return False
 
         if not admin_found:
 
