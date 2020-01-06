@@ -897,11 +897,10 @@ def update_PCC(sample_list, ss_client):
         new_row.cells.append({'column_id': col_ids['Production Notes'], 'value': 'LC dilution drop-off'})
 
         facil_list = []
-
         for contact in row_dict['facilitator']:
-            facil_list.append(update_admin_email(ss_client, contact))
+            facil_list.append({"email": update_admin_email(ss_client, contact), "name": contact})
 
-        new_row.cells.append({'column_id': col_ids['Facilitator'], 'object_value': ', '.join(facil_list)})
+        new_row.cells.append({"columnId": col_ids['Facilitator'], "objectValue": {"objectType": "MULTI_CONTACT", "values": facil_list}})
 
         new_row_response = ss_client.smart_sheet_client.Sheets.add_rows(prod_comm_sheet.id, [new_row]).data[0]
 

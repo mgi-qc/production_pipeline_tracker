@@ -534,7 +534,7 @@ def main():
                    'rba': 'rb_assessment.py',
                    'pb': 'plate_sorter.py'}
 
-    if not args.f and not args.pb and not args.rba:
+    if not args.f and (args.qpcr or args.capture):
         sys.exit('Please run with: -f <input_file>')
 
     if args.dev:

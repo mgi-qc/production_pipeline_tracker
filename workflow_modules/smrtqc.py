@@ -95,6 +95,7 @@ class SmartQC:
                     return self.get_object(space.id, 'w')
                 else:
                     return KeyError
+
         elif tag == 'lib_core':
             for space in self.get_workspace_list():
                 if space.name == 'Library Core Workspace':
@@ -104,6 +105,8 @@ class SmartQC:
     def get_working_directory(tag, dev=False):
 
         # TODO: Add locations for all other commands in smartflow
+        # TODO: Change dev location for directories
+        # TODO: Use dictionary for routing
         if dev:
             if tag == 'qpcr':
                 return '/gscmnt/gc2746/production/smartflow/production_files/library_core/qpcr_dropoff'
