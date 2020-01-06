@@ -529,37 +529,38 @@ def main():
         print('Samples updated: {}'.format(updated_samples))
         print('\nDilution Drop Off Complete\n')
 
+    script_dict = {'qpcr': 'qPCR_dropoff_wrapper.py',
+                   'capture': 'qPCR_dropoff_wrapper.py',
+                   'rba': 'rb_assessment.py',
+                   'pb': 'plate_sorter.py'}
+
+    if not args.f and not args.pb and not args.rba:
+        sys.exit('Please run with: -f <input_file>')
+
     if args.dev:
-        if args.qpcr:
-            if not args.f:
-                sys.exit('Please run with: -f <input_file>')
-            subprocess.run(["python3", "{}/qPCR_dropoff_wrapper.py".format(smrtqc.get_working_directory('wm')), "-f", args.f, "-q", "-dev"])
-
-        if args.capture:
-            if not args.f:
-                sys.exit('Please run with: -f <input_file>')
-            subprocess.run(["python3", "{}/qPCR_dropoff_wrapper.py".format(smrtqc.get_working_directory('wm')), "-f", args.f, "-c", "-dev"])
-        if args.rba:
-            subprocess.run(["python3", "{}/rb_assessment.py".format(smrtqc.get_working_directory('wm')), "-dev"])
-
-        if args.pb:
-            subprocess.run(["python3", "{}/plate_sorter.py".format(smrtqc.get_working_directory('wm')), "-dev"])
+        dev_str = '-dev'
+        dev = True
     else:
-        if args.qpcr:
-            if not args.f:
+        dev_str = ''
+        dev = False
 
-                sys.exit('Please run with: -f <input_file>')
-            subprocess.run(["python3", "{}/qPCR_dropoff_wrapper.py".format(smrtqc.get_working_directory('wm')), "-f", args.f, "-q"])
+    if args.qpcr:
+        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+                                                           script=script_dict['qpcr']),
+                        "-f", args.f, "-q", dev_str])
+    if args.pb:
+        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+                                                           script=script_dict['pb']),
+                        dev_str])
 
-        if args.capture:
-            if not args.f:
-                sys.exit('Please run with: -f <input_file>')
-            subprocess.run(["python3", "{}/qPCR_dropoff_wrapper.py".format(smrtqc.get_working_directory('wm')),"-f", args.f, "-c"])
-        if args.rba:
-            subprocess.run(["python3", "{}/rb_assessment.py".format(smrtqc.get_working_directory('wm'))])
-
-        if args.pb:
-            subprocess.run(["python3", "{}/plate_sorter.py".format(smrtqc.get_working_directory('wm'))])
+    if args.capture:
+        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+                                                           script=script_dict['qpcr']),
+                        "-f", args.f, "-c", dev_str])
+    if args.rba:
+        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+                                                           script=script_dict['rba']),
+                        dev_str])
 
 if __name__ == '__main__':
     main()
