@@ -13,7 +13,7 @@ from datetime import datetime
 import subprocess
 import glob
 import smrtqc
-
+import argparse
 
 # Misc Functions
 def is_num(s):
@@ -193,7 +193,6 @@ def check_row_for_sample(sample, row, column_ids, woid):
         return False
 
 
-
 def check_header(given_header):
     """
     Checks header for inventory file
@@ -249,12 +248,16 @@ def main():
     TODO: Build report from template provided
     TODO: Mark failed samples in smartsheet to kick off workflow
     """
+    # Set dev option
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-dev', help='Used for development and testing purposes', action='store_true')
+    args = parser.parse_args()
 
     # Initialize smrtqc object
     ss_client = smrtqc.SmartQC(api_key=os.environ.get('SMRT_API'))
 
     # Change directories to smartflow
-    os.chdir('/gscmnt/gc2746/production/smartflow/production_files/resource_bank')
+    os.chdir(ss_client.get_working_directory('rb'))
 
     # get RB work order and Pass/Fail conditions from input
     woid = get_wo_id()

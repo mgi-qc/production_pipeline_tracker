@@ -9,6 +9,7 @@ import glob
 import datetime
 import subprocess
 import smrtqc
+import argparse
 
 
 # Classes for plate building
@@ -157,12 +158,21 @@ def main():
     TODO: Log failures
     """
     try:
-        # Change to correct directory
-        orig_dir = os.getcwd()
-        os.chdir('/gscmnt/gc2746/production/smartflow/production_files/library_core/plate_building')
+
+        # Set dev option
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-dev', help='Used for development and testing purposes', action='store_true')
+        args = parser.parse_args()
 
         # Get Smaetsheet client
         ss_client = smrtqc.SmartQC(api_key=os.environ.get('SMRT_API'))
+
+        # Change to correct directory
+        orig_dir = os.getcwd()
+        if args.dev:
+            os.chdir(ss_client.get_working_directory('pb', dev=True))
+        else:
+            os.chdir(ss_client.get_working_directory('pb'))
 
         # Import Pipeline file
         pipe_dict = get_pipelines()
@@ -192,8 +202,7 @@ def main():
         outgoing_plates = sort_to_outgoing_plates(plate_list=master_current_plates)
 
         # Update SmartSheets
-        update_smart_sheets\
-            (sample_master_list, outgoing_plates, ss_client)
+        update_smart_sheets(sample_master_list, outgoing_plates, ss_client)
     finally:
 
         # Update FFPE file
@@ -700,6 +709,7 @@ def put_bin_in_pipe(bins):
 
 def order_bins(bins):
     """
+    Sort bins from greatest to least using insertion sort.
 
     :param bins: list of plate objects
     :return: list of plate objects sorted greatest to least
@@ -737,7 +747,6 @@ def update_smart_sheets(sample_list, outgoing_plates, ss_client):
     print('- Loading plate sheets into Library Core')
     workspaces = ss_client.get_workspace_list()
 
-    # TODO: Make Library Core Space/Folder somewhere that makes sense
     for workspace in workspaces:
         if workspace.name == 'Library Core Workspace':
             lib_workspace = ss_client.get_object(workspace.id, 'w')
@@ -874,8 +883,9 @@ def update_PCC(sample_list, ss_client):
 
         for row in prod_comm_sheet.rows:
             for cell in row.cells:
-                if cell.value == 'LC dilution drop-off':
-                    lcddo_row = row
+                if cell.column_id == col_ids['Reporting Instance']:
+                    if cell.value == 'LC dilution drop-off':
+                        lcddo_row = row
 
         new_row = smartsheet.smartsheet.models.Row()
         new_row.parent_id = lcddo_row.id
@@ -884,13 +894,13 @@ def update_PCC(sample_list, ss_client):
         new_row.cells.append({'column_id': col_ids['Items'], 'value': row_dict['no_items']})
         new_row.cells.append({'column_id': col_ids['Admin Project'], 'value': ','.join(row_dict['admin_proj'])})
         new_row.cells.append({'column_id': col_ids['Event Date'], 'value': datetime.datetime.now().strftime("%Y-%m-%d")})
+        new_row.cells.append({'column_id': col_ids['Production Notes'], 'value': 'LC dilution drop-off'})
 
         facil_list = []
-
         for contact in row_dict['facilitator']:
-            facil_list.append(update_admin_email(ss_client, contact))
+            facil_list.append({"email": update_admin_email(ss_client, contact), "name": contact})
 
-        new_row.cells.append({'column_id': col_ids['Facilitator'], 'object_value': ', '.join(facil_list)})
+        new_row.cells.append({"columnId": col_ids['Facilitator'], "objectValue": {"objectType": "MULTI_CONTACT", "values": facil_list}})
 
         new_row_response = ss_client.smart_sheet_client.Sheets.add_rows(prod_comm_sheet.id, [new_row]).data[0]
 
@@ -991,7 +1001,7 @@ def update_MSS_sheets(admin_wo_samp_dict, ss_client):
             if folder.name == 'Admin Projects':
                 admin_folder = ss_client.get_object(folder.id, 'f')
 
-        for folder in admin_folder.id:
+        for folder in admin_folder.folders:
             if folder.name == 'Active Projects':
                 active_folder = ss_client.get_object(folder.id, 'f')
 

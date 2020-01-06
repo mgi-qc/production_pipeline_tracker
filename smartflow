@@ -31,6 +31,8 @@ parser.add_argument('-tkb', help='Sequencing complete total kb cut off', type=in
 parser.add_argument('-qpcr', help='qPCR dropoff', action='store_true')
 parser.add_argument('-capture', help='Capture dropoff', action='store_true')
 parser.add_argument('-rba', help='Resource bank assessment', action='store_true')
+parser.add_argument('-pb', help='Library Core Plate Builder', action='store_true')
+parser.add_argument('-dev', help='Point scripts toward development workspace and directories', action='store_true')
 args = parser.parse_args()
 
 
@@ -531,20 +533,38 @@ def main():
         print('Samples updated: {}'.format(updated_samples))
         print('\nDilution Drop Off Complete\n')
 
+    script_dict = {'qpcr': 'qPCR_dropoff_wrapper.py',
+                   'capture': 'qPCR_dropoff_wrapper.py',
+                   'rba': 'rb_assessment.py',
+                   'pb': 'plate_sorter.py'}
+
+    if not args.f and (args.qpcr or args.capture):
+        sys.exit('Please run with: -f <input_file>')
+
+    if args.dev:
+        dev_str = '-dev'
+        dev = True
+    else:
+        dev_str = ''
+        dev = False
+
     if args.qpcr:
-        if not args.f:
-            sys.exit('Please run with: -f <input_file>')
-        subprocess.run(["python3", "/gscmnt/gc2746/production/smartflow/bin/workflow_modules/qPCR_dropoff_wrapper.py",
-                        "-f", args.f, "-q"])
+        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+                                                           script=script_dict['qpcr']),
+                        "-f", args.f, "-q", dev_str])
+    if args.pb:
+        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+                                                           script=script_dict['pb']),
+                        dev_str])
 
     if args.capture:
-        if not args.f:
-            sys.exit('Please run with: -f <input_file>')
-        subprocess.run(["python3", "/gscmnt/gc2746/production/smartflow/bin/workflow_modules/qPCR_dropoff_wrapper.py",
-                        "-f", args.f, "-c"])
+        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+                                                           script=script_dict['qpcr']),
+                        "-f", args.f, "-c", dev_str])
     if args.rba:
-        subprocess.run(["python3", "/gscmnt/gc2746/production/smartflow/bin/workflow_modules/rb_assessment.py"])
-
+        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+                                                           script=script_dict['rba']),
+                        dev_str])
 
 if __name__ == '__main__':
     main()
