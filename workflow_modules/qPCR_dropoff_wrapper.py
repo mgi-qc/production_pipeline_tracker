@@ -41,14 +41,18 @@ def load_dropoff_into_smartsheet(dropoff_sheet, wo_sheet, info, smartsheet_obj, 
         if sheet.name == 'Production Communications Center':
             prod_sheet = smartsheet_obj.get_object(sheet.id, 's')
 
+    column_ids = smartsheet_obj.get_column_ids(prod_sheet.id)
+
     for row in prod_sheet.rows:
         for cell in row.cells:
-            if cell.value == 'qPCR dilution drop-off' and args.q:
-                header_row = row
-            elif cell.value == 'capture drop-off' and args.c:
-                header_row = row
+            if cell.column_id == column_ids['Reporting Instance']:
+                if cell.value == 'qPCR dilution drop-off' and args.q:
+                    header_row = row
+                    prod_note = 'qPCR dilution drop-off'
+                elif cell.value == 'capture drop-off' and args.c:
+                    header_row = row
+                    prod_note = 'capture drop-off'
 
-    column_ids = smartsheet_obj.get_column_ids(prod_sheet.id)
 
     # get list of facilitators involved in this dropoff
     facil_list = []
@@ -65,27 +69,9 @@ def load_dropoff_into_smartsheet(dropoff_sheet, wo_sheet, info, smartsheet_obj, 
     new_row.cells.append({'column_id': column_ids['Items'], 'value': num_samples})
     new_row.cells.append({"columnId": column_ids['Facilitator'], "objectValue": {"objectType": "MULTI_CONTACT", "values": facil_list}})
     new_row.cells.append({'column_id': column_ids['Event Date'], 'value': info['Date']})
+    new_row.cells.append({'column_id': column_ids['Production Notes'], 'value': prod_note})
 
     new_row_response = smartsheet_obj.smart_sheet_client.Sheets.add_rows(prod_sheet.id, [new_row]).data[0]
-
-    # Graciously provided by @ltrani
-    print('\nAdd comment to dropoff row in PCC; "Enter q enter" when finished or "q enter" to continue without comment:\n')
-    comment = []
-    while True:
-        line = input()
-        if line != 'q':
-            comment.append(line.strip())
-        else:
-            comment = '\n'.join(comment)
-            break
-
-    # comment = 'Making some comments yo'
-    if comment:
-        smartsheet_obj.smart_sheet_client.Discussions.create_discussion_on_row(prod_sheet.id, new_row_response.id,
-                                                                             smartsheet_obj.smart_sheet_client.models.
-                                                                             Discussion({'comment': smartsheet_obj.
-                                                                                        smart_sheet_client.models.
-                                                                                        Comment({'text': comment})}))
 
     attached_file = smartsheet_obj.smart_sheet_client.Attachments.attach_file_to_row(prod_sheet.id, new_row_response.id, (dropoff_sheet, open(dropoff_sheet), 'rb'))
 
@@ -345,6 +331,8 @@ def main():
     parser.add_argument('-f', help='Name of barcodes file Usage "-f <input-file>"', type=str)
     parser.add_argument('-q', help='Updates given barcodes as qpcr and generates dropoff in qPCR dropoff in PCC', action='store_true')
     parser.add_argument('-c', help='Updates given barcodes as capture and generates dropoff in Capture dropoff in PCC', action='store_true')
+    parser.add_argument('-dev', help='Used for development and testing purposes', action='store_true')
+
     args = parser.parse_args()
 
     if args.f:
@@ -354,9 +342,13 @@ def main():
     else:
         print('-f is a required field, see smartflow usage using -h')
 
+    # Set up Smartsheet client using smrtqc package and API key set as an environment variable
+    api_key = os.environ.get('SMRT_API')
+    ssobj = smrtqc.SmartQC(api_key)
+
     orig_dir = os.getcwd()
-    shutil.copyfile(args.f, '/gscmnt/gc2746/production/smartflow/production_files/library_core/qpcr_dropoff/' + args.f)
-    os.chdir('/gscmnt/gc2746/production/smartflow/production_files/library_core/qpcr_dropoff')
+    shutil.copyfile(args.f, ssobj.get_working_directory('qpcr') + args.f)
+    os.chdir(ssobj.get_working_directory('qpcr'))
 
     if args.q:
         status = 'qPCR drop-off'
@@ -364,10 +356,6 @@ def main():
         status = 'capture drop-off'
     else:
         exit('Must specify qPCR(-qpcr) or Capture(-capture)')
-
-    # Set up Smartsheet client using smrtqc package and API key set as an environment variable
-    api_key = os.environ.get('SMRT_API')
-    ssobj = smrtqc.SmartQC(api_key)
 
     # Get dilution drop off and work order sheets via lims commands
     send_get_sheets(args.f)

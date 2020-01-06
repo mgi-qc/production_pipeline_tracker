@@ -79,6 +79,65 @@ class SmartQC:
 
         self.lt_test(object_tag)
 
+    def get_workspace(self, tag):
 
+        # return dev workspace
+        if tag == 'dev':
+            # TODO: Add dev space once importing is completed and we have spare sheets
 
+            return KeyError
 
+        # return standard space
+        elif tag == 'std':
+
+            for space in self.get_workspace_list():
+                if space.name == 'Smartflow Production Workspace':
+                    return self.get_object(space.id, 'w')
+                else:
+                    return KeyError
+        elif tag == 'lib_core':
+            for space in self.get_workspace_list():
+                if space.name == 'Library Core Workspace':
+                    return self.get_object(space.id, 'w')
+
+    @staticmethod
+    def get_working_directory(tag, dev=False):
+
+        # TODO: Add locations for all other commands in smartflow
+        if dev:
+            if tag == 'qpcr':
+                return '/gscmnt/gc2746/production/smartflow/production_files/library_core/qpcr_dropoff'
+
+            elif tag == 'capture':
+                return '/gscmnt/gc2746/production/smartflow/production_files/library_core/capture_dropoff'
+
+            elif tag == 'pb':
+                return '/gscmnt/gc2746/production/smartflow/production_files/library_core/plate_building'
+
+            elif tag == 'rb':
+                return '/gscmnt/gc2746/production/smartflow/production_files/resource_bank'
+
+            elif tag == 'bin':
+                return '/gscmnt/gc2746/production/smartflow/bin'
+
+            elif tag == 'wm':
+                return '/gscmnt/gc2746/production/smartflow/bin/workflow_modules'
+
+        else:
+            if tag == 'qpcr':
+                return '/gscmnt/gc2746/production/smartflow/dev/production_files/library_core/qpcr_dropoff'
+
+            elif tag == 'capture':
+                return '/gscmnt/gc2746/production/smartflow/dev/production_files/library_core/capture_dropoff'
+
+            elif tag == 'pb':
+                return '/gscmnt/gc2746/production/smartflow/dev/production_files/library_core/plate_building'
+
+            elif tag == 'rb':
+                return '/gscmnt/gc2746/production/smartflow/dev/production_files/resource_bank'
+
+            elif tag == 'bin':
+                return '/gscmnt/gc2746/production/smartflow/dev/bin'
+
+            elif tag == 'wm':
+                return '/gscmnt/gc2746/production/smartflow/dev/bin/workflow_modules'

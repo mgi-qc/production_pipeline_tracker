@@ -31,6 +31,8 @@ parser.add_argument('-tkb', help='Sequencing complete total kb cut off', type=in
 parser.add_argument('-qpcr', help='qPCR dropoff', action='store_true')
 parser.add_argument('-capture', help='Capture dropoff', action='store_true')
 parser.add_argument('-rba', help='Resource bank assessment', action='store_true')
+parser.add_argument('-pb', help='Library Core Plate Builder', action='store_true')
+parser.add_argument('-dev', help='Point scripts toward development workspace and directories', action='store_true')
 args = parser.parse_args()
 
 
@@ -527,20 +529,37 @@ def main():
         print('Samples updated: {}'.format(updated_samples))
         print('\nDilution Drop Off Complete\n')
 
-    if args.qpcr:
-        if not args.f:
-            sys.exit('Please run with: -f <input_file>')
-        subprocess.run(["python3", "/gscmnt/gc2746/production/smartflow/bin/workflow_modules/qPCR_dropoff_wrapper.py",
-                        "-f", args.f, "-q"])
+    if args.dev:
+        if args.qpcr:
+            if not args.f:
+                sys.exit('Please run with: -f <input_file>')
+            subprocess.run(["python3", "{}/qPCR_dropoff_wrapper.py".format(smrtqc.get_working_directory('wm')), "-f", args.f, "-q", "-dev"])
 
-    if args.capture:
-        if not args.f:
-            sys.exit('Please run with: -f <input_file>')
-        subprocess.run(["python3", "/gscmnt/gc2746/production/smartflow/bin/workflow_modules/qPCR_dropoff_wrapper.py",
-                        "-f", args.f, "-c"])
-    if args.rba:
-        subprocess.run(["python3", "/gscmnt/gc2746/production/smartflow/bin/workflow_modules/rb_assessment.py"])
+        if args.capture:
+            if not args.f:
+                sys.exit('Please run with: -f <input_file>')
+            subprocess.run(["python3", "{}/qPCR_dropoff_wrapper.py".format(smrtqc.get_working_directory('wm')), "-f", args.f, "-c", "-dev"])
+        if args.rba:
+            subprocess.run(["python3", "{}/rb_assessment.py".format(smrtqc.get_working_directory('wm')), "-dev"])
 
+        if args.pb:
+            subprocess.run(["python3", "{}/plate_sorter.py".format(smrtqc.get_working_directory('wm')), "-dev"])
+    else:
+        if args.qpcr:
+            if not args.f:
+
+                sys.exit('Please run with: -f <input_file>')
+            subprocess.run(["python3", "{}/qPCR_dropoff_wrapper.py".format(smrtqc.get_working_directory('wm')), "-f", args.f, "-q"])
+
+        if args.capture:
+            if not args.f:
+                sys.exit('Please run with: -f <input_file>')
+            subprocess.run(["python3", "{}/qPCR_dropoff_wrapper.py".format(smrtqc.get_working_directory('wm')),"-f", args.f, "-c"])
+        if args.rba:
+            subprocess.run(["python3", "{}/rb_assessment.py".format(smrtqc.get_working_directory('wm'))])
+
+        if args.pb:
+            subprocess.run(["python3", "{}/plate_sorter.py".format(smrtqc.get_working_directory('wm'))])
 
 if __name__ == '__main__':
     main()
