@@ -146,6 +146,8 @@ class phRowUpdate:
             new_admin_row.cells.append({'column_id': self.col_dict['Items'], 'formula': '=SUM(CHILDREN())'})
             new_admin_row.cells.append({'column_id': self.col_dict['WOID Status'],
                                         'formula': '=SUM(CHILDREN())'})
+            new_admin_row.cells.append({'column_id': self.col_dict['Facilitator'],
+                                        'object_value': self.admin['user email']})
             new_admin_row.to_bottom = True
             new_admin_row.parent_id = project_name_row_id
 

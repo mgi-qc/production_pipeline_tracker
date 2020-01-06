@@ -512,7 +512,7 @@ def main():
 
             # update samples
             pcc_fails, samp_updated = d.sample_update(ss_conn=s, sample_sheet_dict=smartsheet_mss_sample_sheets,
-                                                      woids=ddo_woids, pipe=admin_info['Pipeline'], samples=ddo_samples,
+                                                      woids=ddo_woids, samples=ddo_samples,
                                                       date=ddo_date, status=ddo_update_status, fails=failed_samples)
 
             updated_samples += samp_updated

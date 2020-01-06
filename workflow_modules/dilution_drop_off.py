@@ -10,7 +10,6 @@ class Ddo:
 
     mss_required_columns = ['Fail',
                             'Work Order ID',
-                            'Pipeline',
                             'Current Production Status',
                             'Sample Full Name',
                             'Sequencing Scheduled Date',
@@ -106,7 +105,7 @@ class Ddo:
 
         return list(set(woids)), bc_dict_data
 
-    def sample_update(self, ss_conn, sample_sheet_dict, woids, pipe, samples, date, status, fails):
+    def sample_update(self, ss_conn, sample_sheet_dict, woids, samples, date, status, fails):
 
         woid_fail_sample_count = {}
 
@@ -159,11 +158,6 @@ class Ddo:
                         new_cell = ss_conn.smart_sheet_client.models.Cell()
                         new_cell.column_id = sheet_col_ids[date_column_name]
                         new_cell.value = date
-                        new_row.cells.append(new_cell)
-
-                        new_cell = ss_conn.smart_sheet_client.models.Cell()
-                        new_cell.column_id = sheet_col_ids['Pipeline']
-                        new_cell.value = pipe
                         new_row.cells.append(new_cell)
 
                         failed_status = False
