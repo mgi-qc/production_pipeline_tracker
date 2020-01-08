@@ -311,15 +311,16 @@ class SequencingUpdate:
                                                                                 'application/Excel'))
             sleep(5)
 
-        comment = input('\nSequence Complete Comments (Enter to continue without comment):\n')
+        # turned off per request of Matt
+        # comment = input('\nSequence Complete Comments (Enter to continue without comment):\n')
 
-        if comment:
-            ss_connector.smart_sheet_client.Discussions.create_discussion_on_row(sheet.id, new_title_row_id,
-                                                                                 ss_connector.smart_sheet_client.models.
-                                                                                 Discussion({'comment': ss_connector.
-                                                                                            smart_sheet_client.models.
-                                                                                            Comment({'text': comment})})
-                                                                                 )
+        # if comment:
+        #     ss_connector.smart_sheet_client.Discussions.create_discussion_on_row(sheet.id, new_title_row_id,
+        #                                                                          ss_connector.smart_sheet_client.models.
+        #                                                                          Discussion({'comment': ss_connector.
+        #                                                                                     smart_sheet_client.models.
+        #                                                                                     Comment({'text': comment})})
+        #                                                                          )
 
         return
 
