@@ -548,21 +548,23 @@ def main():
         dev_str = ''
         dev = False
 
+    ss_client = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+
     if args.qpcr:
-        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+        subprocess.run(["python3", "{dir}/{script}".format(dir=ss_client.get_working_directory('wm', dev=dev),
                                                            script=script_dict['qpcr']),
                         "-f", args.f, "-q", dev_str])
     if args.pb:
-        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+        subprocess.run(["python3", "{dir}/{script}".format(dir=ss_client.get_working_directory('wm', dev=dev),
                                                            script=script_dict['pb']),
                         dev_str])
 
     if args.capture:
-        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+        subprocess.run(["python3", "{dir}/{script}".format(dir=ss_client.get_working_directory('wm', dev=dev),
                                                            script=script_dict['qpcr']),
                         "-f", args.f, "-c", dev_str])
     if args.rba:
-        subprocess.run(["python3", "{dir}/{script}".format(dir=smrtqc.get_working_directory('wm', dev=dev),
+        subprocess.run(["python3", "{dir}/{script}".format(dir=ss_client.get_working_directory('wm', dev=dev),
                                                            script=script_dict['rba']),
                         dev_str])
 
