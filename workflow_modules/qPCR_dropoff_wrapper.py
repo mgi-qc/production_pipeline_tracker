@@ -56,8 +56,12 @@ def load_dropoff_into_smartsheet(dropoff_sheet, wo_sheet, info, smartsheet_obj, 
 
     # get list of facilitators involved in this dropoff
     facil_list = []
-    for person in info['Outgoing Queue Work Order Facilitator']:
-        facil_list.append({"email": update_admin_email(smartsheet_obj, person), "name": person})
+    facilitators = []
+    for facil in info['Outgoing Queue Work Order Facilitator']:
+        for person in facil.split(','):
+            if person not in facilitators:
+                facilitators.append(person)
+                facil_list.append({"email": update_admin_email(smartsheet_obj, person), "name": person})
 
     # Build new cells for
     new_row = smartsheet.smartsheet.models.Row()

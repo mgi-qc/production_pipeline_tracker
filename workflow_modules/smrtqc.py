@@ -11,6 +11,19 @@ class SmartQC:
 
         self.smart_sheet_client = smartsheet.Smartsheet(api_key)
         self.smart_sheet_client.errors_as_exceptions(True)
+        self.routing_dict = {'qpcr':'/gscmnt/gc2746/production/smartflow/production_files/library_core/qpcr_dropoff',
+                             'capture': '/gscmnt/gc2746/production/smartflow/production_files/library_core/capture_dropoff',
+                             'pb': '/gscmnt/gc2746/production/smartflow/production_files/library_core/plate_building',
+                             'rb': '/gscmnt/gc2746/production/smartflow/production_files/resource_bank',
+                             'bin': '/gscmnt/gc2746/production/smartflow/bin',
+                             'wm': '/gscmnt/gc2746/production/smartflow/bin/workflow_modules'}
+
+        self.dev_routing_dict = {'qpcr': '/gscmnt/gc2746/production/smartflow/dev/production_files/library_core/qpcr_dropoff',
+                                 'capture': '/gscmnt/gc2746/production/smartflow/dev/production_files/library_core/capture_dropoff',
+                                 'pb': '/gscmnt/gc2746/production/smartflow/dev/production_files/library_core/plate_building',
+                                 'rb': '/gscmnt/gc2746/production/smartflow/dev/production_files/resource_bank',
+                                 'bin': '/gscmnt/gc2746/production/smartflow/dev/bin',
+                                 'wm': '/gscmnt/gc2746/production/smartflow/dev/bin/workflow_modules'}
 
     @staticmethod
     def lt_test(lt):
@@ -101,46 +114,11 @@ class SmartQC:
                 if space.name == 'Library Core Workspace':
                     return self.get_object(space.id, 'w')
 
-    @staticmethod
-    def get_working_directory(tag, dev=False):
+    def get_working_directory(self, tag, dev=False):
 
         # TODO: Add locations for all other commands in smartflow
-        # TODO: Change dev location for directories
-        # TODO: Use dictionary for routing
-        if dev:
-            if tag == 'qpcr':
-                return '/gscmnt/gc2746/production/smartflow/production_files/library_core/qpcr_dropoff'
 
-            elif tag == 'capture':
-                return '/gscmnt/gc2746/production/smartflow/production_files/library_core/capture_dropoff'
-
-            elif tag == 'pb':
-                return '/gscmnt/gc2746/production/smartflow/production_files/library_core/plate_building'
-
-            elif tag == 'rb':
-                return '/gscmnt/gc2746/production/smartflow/production_files/resource_bank'
-
-            elif tag == 'bin':
-                return '/gscmnt/gc2746/production/smartflow/bin'
-
-            elif tag == 'wm':
-                return '/gscmnt/gc2746/production/smartflow/bin/workflow_modules'
-
+        if not dev:
+            return self.routing_dict[tag]
         else:
-            if tag == 'qpcr':
-                return '/gscmnt/gc2746/production/smartflow/dev/production_files/library_core/qpcr_dropoff'
-
-            elif tag == 'capture':
-                return '/gscmnt/gc2746/production/smartflow/dev/production_files/library_core/capture_dropoff'
-
-            elif tag == 'pb':
-                return '/gscmnt/gc2746/production/smartflow/dev/production_files/library_core/plate_building'
-
-            elif tag == 'rb':
-                return '/gscmnt/gc2746/production/smartflow/dev/production_files/resource_bank'
-
-            elif tag == 'bin':
-                return '/gscmnt/gc2746/production/smartflow/dev/bin'
-
-            elif tag == 'wm':
-                return '/gscmnt/gc2746/production/smartflow/dev/bin/workflow_modules'
+            return self.dev_routing_dict[tag]
