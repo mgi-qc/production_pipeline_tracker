@@ -351,9 +351,10 @@ def main():
     ssobj = smrtqc.SmartQC(api_key)
 
     orig_dir = os.getcwd()
-    shutil.copyfile(args.f, ssobj.get_working_directory('qpcr') + args.f)
+    shutil.copyfile(args.f, ssobj.get_working_directory('qpcr') + '/' + args.f)
     os.chdir(ssobj.get_working_directory('qpcr'))
 
+    print(args.f)
     if args.q:
         status = 'qPCR drop-off'
     elif args.c:
