@@ -242,7 +242,10 @@ def update_sample_statuses(dil_drop, info, smartsheet_cl, sample_status):
                         if sample_found and wo_found:
                             status_cell = smartsheet.smartsheet.models.Cell()
                             date_cell = smartsheet.smartsheet.models.Cell()
-                            date_cell.column_id = col_ids['qPCR drop off date']
+                            if sample_status == 'qPCR drop-off':
+                                date_cell.column_id = col_ids['qPCR drop off date']
+                            elif sample_status == 'capture drop-off':
+                                date_cell.column_id = col_ids['Capture drop off date']
                             date_cell.value = info['Date']
                             status_cell.column_id = col_ids['Current Production Status']
                             status_cell.value = sample_status
