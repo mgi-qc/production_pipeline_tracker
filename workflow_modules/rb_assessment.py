@@ -1,10 +1,5 @@
 __author__ = 'Thomas Antonacci'
 
-"""
-TODO: Catching bad input...
-TODO: Input minimum; request input check box in smartsheet
-"""
-
 import smartsheet
 import csv
 import os
@@ -60,9 +55,10 @@ def get_wo_id():
 
 
 def get_total_dna_needed():
-    """
-    TODO: Get min dna req and standard req
-    :return: total_in : total dna required for resource work order
+    """"
+    Get and check minimum and standard amount of dna required for pass/borderline/fail from user input
+
+    :return: min_req, std_req : tuple of minimum and standard amount of dna required for pass/borderline/fail
     """
     print('Please enter the minimum amount of dna needed for the sample to pass(in ng): ')
 
@@ -84,6 +80,8 @@ def get_total_dna_needed():
             std_req = float(std_in)
         else:
             print('Please enter a positive number: ')
+
+        return (min_req, std_req)
 
 
 def make_std_file(inventory_file):
@@ -242,11 +240,26 @@ def add_comment_to_PCC(prod_space, woid, ss_connector):
                                                                                         Comment({'text': comment})}))
 
 
+def build_assement_report():
+    """
+    TODO: Get info needed:
+    TODO: - Total # of Samples
+    TODO: - Sequenceing plan
+    TODO: - # samples passed from standard
+    TODO: - # samples passed on minimum
+    TODO: - # samples failing min
+    TODO: - # samples failed(less than 50)
+    TODO: build template or hardcode template for output
+
+
+    """
+
 def main():
     """
-    TODO: Make directory and workspace routing centralized to smartflow/smrtqc
     TODO: Build report from template provided
+    TODO: Add report to smartsheet resource work order row in PCC
     TODO: Mark failed samples in smartsheet to kick off workflow
+    TODO: Check desired smaple status for passing vs failed
     """
     # Set dev option
     parser = argparse.ArgumentParser()
@@ -261,7 +274,7 @@ def main():
 
     # get RB work order and Pass/Fail conditions from input
     woid = get_wo_id()
-    total_dna_req = get_total_dna_needed()
+    min_dna_req, std_dna_req = get_total_dna_needed()
 
     # get info from lims using query
     print('Getting Inventory Sheet from LIMS...')

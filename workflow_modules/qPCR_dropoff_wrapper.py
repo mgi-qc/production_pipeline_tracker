@@ -16,6 +16,27 @@ import shutil
 This wrapper script MUST be run on a docker image with access to lims commands
 """
 
+def get_bc_input():
+    """
+
+    :return: file name of barcode list
+    """
+    print('Please paste in barcodes from Dilution Drop Off (Enter "return q return" when finished): ')
+
+    bcs = []
+    while True:
+        bc_line = input()
+        if bc_line != 'q':
+            bcs.append(bc_line.strip())
+        else:
+            break
+
+    bc_file = 'barcodes.fof'
+    with open(bc_file, 'w') as fout:
+        for bc in bcs:
+            fout.write(bc + '\n')
+
+    return bc_file
 
 def load_dropoff_into_smartsheet(dropoff_sheet, wo_sheet, info, smartsheet_obj, args, num_samples):
     """
@@ -242,7 +263,10 @@ def update_sample_statuses(dil_drop, info, smartsheet_cl, sample_status):
                         if sample_found and wo_found:
                             status_cell = smartsheet.smartsheet.models.Cell()
                             date_cell = smartsheet.smartsheet.models.Cell()
-                            date_cell.column_id = col_ids['qPCR drop off date']
+                            if sample_status == 'qPCR drop-off':
+                                date_cell.column_id = col_ids['qPCR drop off date']
+                            elif sample_status == 'capture drop-off':
+                                date_cell.column_id = col_ids['Capture drop off date']
                             date_cell.value = info['Date']
                             status_cell.column_id = col_ids['Current Production Status']
                             status_cell.value = sample_status
@@ -331,6 +355,10 @@ def update_admin_email(ssclient, facilitator):
 
 def main():
 
+    # Set up Smartsheet client using smrtqc package and API key set as an environment variable
+    api_key = os.environ.get('SMRT_API')
+    ssobj = smrtqc.SmartQC(api_key)
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', help='Name of barcodes file Usage "-f <input-file>"', type=str)
     parser.add_argument('-q', help='Updates given barcodes as qpcr and generates dropoff in qPCR dropoff in PCC', action='store_true')
@@ -339,21 +367,37 @@ def main():
 
     args = parser.parse_args()
 
+    # Check for given file or request input
     if args.f:
         file = args.f
         if not os.path.exists(args.f):
             exit('{} not found!'.format(args.f))
+
+        shutil.copyfile(file, ssobj.get_working_directory('qpcr') + file)
+    # Request input if not file flag
     else:
+        # TODO: Add prompt for input if desired, else exit; this has been added, but needs verifying
+        print('No file flag found! Would you like to add barcode through terminal(y/n)? ', end='')
+        ok = False
+        while not ok:
+            cin = input()
+            if cin == 'y':
+                barcodes = get_bc_input()
+                ok = True
+            elif cin == 'n':
+                exit('No barcodes entered, exiting.')
+            else:
+                print('Please enter either "y" or "n"')
+                print('No file flag found! Would you like to add barcode through terminal(y/n)? ', end='')
+
         print('-f is a required field, see smartflow usage using -h')
 
-    # Set up Smartsheet client using smrtqc package and API key set as an environment variable
-    api_key = os.environ.get('SMRT_API')
-    ssobj = smrtqc.SmartQC(api_key)
-
     orig_dir = os.getcwd()
-    shutil.copyfile(args.f, ssobj.get_working_directory('qpcr') + args.f)
+    shutil.copyfile(args.f, ssobj.get_working_directory('qpcr') + '/' + args.f)
+    # Move to qPCR working directory
     os.chdir(ssobj.get_working_directory('qpcr'))
 
+    # Set capture or qpcr
     if args.q:
         status = 'qPCR drop-off'
     elif args.c:
@@ -362,16 +406,21 @@ def main():
         exit('Must specify qPCR(-qpcr) or Capture(-capture)')
 
     # Get dilution drop off and work order sheets via lims commands
-    send_get_sheets(args.f)
+    send_get_sheets(file=file)
 
+    # Parse barcode and work order info from lims queries
     sheet_info = get_info('dilution_drop_off.tsv', 'work_order.tsv')
 
+    # update sample statuses in MSS sheets
     num_samples = update_sample_statuses('dilution_drop_off.tsv', sheet_info, ssobj, status)
 
+    # Update the PCC and load the drop off as row attachment
     load_dropoff_into_smartsheet('dilution_drop_off.tsv', 'work_order.tsv', sheet_info, ssobj, args, num_samples)
 
+    # Move file to appropriate folders
     clean_up_space()
 
+    # Return to original directory
     os.chdir(orig_dir)
 
 
