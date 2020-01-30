@@ -96,8 +96,8 @@ class SequencingUpdate:
         for folder, sheet_info in sheet_info_dict.items():
 
             date = datetime.datetime.now().strftime("%m%d%y")
-            outfile = '{}.sequence.scheduled.all.{}.tsv'.format(admin_info['Work Order ID'], date)
-            outfile_new_samples = '{}.sequence.scheduled.new.{}.tsv'.format(admin_info['Work Order ID'], date)
+            outfile = '{}.sequence.complete.all.{}.tsv'.format(admin_info['Work Order ID'], date)
+            outfile_new_samples = '{}.sequence.complete.new.{}.tsv'.format(admin_info['Work Order ID'], date)
             attachment_files.extend([outfile, outfile_new_samples])
             with open(outfile, 'w') as f, open(outfile_new_samples, 'w') as o_new:
 
