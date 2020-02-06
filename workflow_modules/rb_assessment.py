@@ -10,6 +10,7 @@ import glob
 import smrtqc
 import argparse
 
+
 # Misc Functions
 def is_num(s):
     """
@@ -74,14 +75,15 @@ def get_total_dna_needed():
     print('Please enter the standard amount of dna needed for the sample to pass(in ng): ')
 
     while True:
-        std_in = input()
+        std_req = input()
 
-        if is_num(std_in) and float(std_in) > 0:
-            std_req = float(std_in)
+        if is_num(std_req) and float(std_req) > 0:
+            std_req = float(std_req)
+            break
         else:
             print('Please enter a positive number: ')
 
-        return (min_req, std_req)
+        return min_req, std_req
 
 
 def make_std_file(inventory_file):

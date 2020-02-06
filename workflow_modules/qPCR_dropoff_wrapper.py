@@ -1,5 +1,25 @@
 #!/usr/bin/python3
 
+"""
+This wrapper script MUST be run on a docker image with access to lims commands
+"""
+
+"""
+Template for fails:
+new_cell = ss_conn.smart_sheet_client.models.Cell()
+new_cell.column_id = sheet_col_ids['Fail']
+new_cell.value = True
+new_row.cells.append(new_cell)
+
+new_cell = ss_conn.smart_sheet_client.models.Cell()
+new_cell.column_id = sheet_col_ids['Current Production Status']
+new_cell.value = 'qPCR Failed'
+# turned off red cell color
+# new_cell.format_ = ",,,,,,,,,27,,,,,,"
+new_row.cells.append(new_cell)
+
+"""
+
 import smartsheet
 import sys
 import os
@@ -12,9 +32,6 @@ import datetime
 import glob
 import shutil
 
-"""
-This wrapper script MUST be run on a docker image with access to lims commands
-"""
 
 def get_bc_input():
     """
@@ -37,6 +54,7 @@ def get_bc_input():
             fout.write(bc + '\n')
 
     return bc_file
+
 
 def load_dropoff_into_smartsheet(dropoff_sheet, wo_sheet, info, smartsheet_obj, args, num_samples):
     """
@@ -230,11 +248,10 @@ def update_sample_statuses(dil_drop, info, smartsheet_cl, sample_status):
             admin_folder = folder
 
     for folder in smartsheet_cl.get_folder_list(admin_folder.id, 'f'):
-        print(folder.name)
         if folder.name == 'Active Projects':
             projects_folder = folder
 
-    for folder in smartsheet_cl.get_folder_list(6681905639778180, 'f'):
+    for folder in smartsheet_cl.get_folder_list(projects_folder.id, 'f'):
         if folder.name in samples_dict:
             for sheet in smartsheet_cl.get_object(folder.id, 'f').sheets:
                 rows_to_update = []
@@ -373,27 +390,26 @@ def main():
         if not os.path.exists(args.f):
             exit('{} not found!'.format(args.f))
 
-        shutil.copyfile(file, ssobj.get_working_directory('qpcr') + file)
     # Request input if not file flag
     else:
-        # TODO: Add prompt for input if desired, else exit; this has been added, but needs verifying
+
         print('No file flag found! Would you like to add barcode through terminal(y/n)? ', end='')
         ok = False
         while not ok:
             cin = input()
             if cin == 'y':
-                barcodes = get_bc_input()
+                file = get_bc_input()
                 ok = True
             elif cin == 'n':
+                print('-f is a required field, see smartflow usage using -h')
                 exit('No barcodes entered, exiting.')
             else:
                 print('Please enter either "y" or "n"')
                 print('No file flag found! Would you like to add barcode through terminal(y/n)? ', end='')
 
-        print('-f is a required field, see smartflow usage using -h')
+    shutil.copyfile(file, ssobj.get_working_directory('qpcr') + '/' + file)
 
     orig_dir = os.getcwd()
-    shutil.copyfile(args.f, ssobj.get_working_directory('qpcr') + '/' + args.f)
     # Move to qPCR working directory
     os.chdir(ssobj.get_working_directory('qpcr'))
 
