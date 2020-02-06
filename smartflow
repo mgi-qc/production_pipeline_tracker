@@ -215,6 +215,7 @@ def main():
                 sample_data = w.get_samples()
                 if not sample_data:
                     print('{} wo_info returned no samples or duplicate found.'.format(woid))
+                    print('SAMPLES NOT ADDED TO SMARTFLOW WORKSPACE')
                     continue
 
                 # init smartsheet connection
