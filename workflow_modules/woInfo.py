@@ -94,7 +94,8 @@ class woInfo:
                     data[line['Sample Full Name']] = line
                 else:
                     print('{} sample is duplicate'.format(line['Sample Full Name']))
-                    return False
+                    # turned off exist if duplicats found
+                    # return False
 
         return data
 
