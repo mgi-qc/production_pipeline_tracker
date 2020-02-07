@@ -26,6 +26,7 @@ parser.add_argument('-sf', help='Sequencing scheduled failed samples file', type
 parser.add_argument('-i', help='Sequencing scheduled status: Initial Sequencing Scheduled', action='store_true')
 parser.add_argument('-add', help='Add or append samples to MSS', action='store_true')
 parser.add_argument('-update', help='Update sample status', action='store_true')
+parser.add_argument('-si', help='Initial Sequencing complete update', action='store_true')
 parser.add_argument('-s', help='Sequencing complete update', action='store_true')
 parser.add_argument('-tkb', help='Sequencing complete total kb cut off', type=int)
 parser.add_argument('-qpcr', help='qPCR dropoff', action='store_true')
@@ -49,7 +50,6 @@ def get_project_hub(ssclient):
     op_hub_space = False
     for space in ssclient.get_workspace_list():
         if space.name == 'Smartflow Production Workspace':
-        # if space.name == 'Workspace population':
             op_hub_space = space
 
     if not op_hub_space:
@@ -78,7 +78,6 @@ def get_sample_sheet(ssclient, admin, update=None):
     active_project_id = ''
     for space in ssclient.get_workspace_list():
         if space.name == 'Smartflow Production Workspace':
-        # if space.name == 'Workspace population':
             op_hub_space = space
 
     if not op_hub_space:
@@ -137,7 +136,7 @@ def get_sample_sheet(ssclient, admin, update=None):
 
 
 def update_admin_email(ssclient, facilitator):
-    # print(facilitator)
+
     user_sheet = ssclient.get_object(252568824768388, 's')
     sheet_column_dict = get_column_ids(user_sheet.columns)
     found_user = False
@@ -186,7 +185,7 @@ if args.w:
 
 def main():
 
-    if (args.f or args.w) and (args.add or args.update or args.s):
+    if (args.f or args.w) and (args.add or args.update or args.s or args.si):
         count = 0
         for woid in woids:
             print('\n**********\nStarting update on {}:\n'.format(woid))
@@ -355,7 +354,11 @@ def main():
 
                 print('\nSmartsheet resource work order tracking updates complete.')
 
-            if args.s:
+            if args.s or args.si:
+
+                sequence_complete_status = 'Sequencing Completed'
+                if args.si:
+                    sequence_complete_status = 'Initial Sequencing Completed'
 
                 print('Processing {} for Smartsheet tracking'.format(woid))
 
@@ -396,7 +399,8 @@ def main():
                 updated_sample_num, attachments = i.update_mss_sheet(ss_conn=s, admin_info=admin_info,
                                                                      sample_data=sample_data,
                                                                      sheet_info_dict=smartsheet_mss_sample_sheets,
-                                                                     failed_samples=failed_samples)
+                                                                     failed_samples=failed_samples,
+                                                                     s_status=sequence_complete_status)
 
                 upload_files = []
                 for file in outfiles + attachments:
@@ -408,7 +412,8 @@ def main():
 
                 # exit()
                 i.pcc_update(ss_connector=pcc, pccs=pccs, woid=woid, admin_info=admin_info,
-                             sample_number=updated_sample_num, attachment=upload_files)
+                             sample_number=updated_sample_num, attachment=upload_files,
+                             s_status=sequence_complete_status)
 
                 for file in upload_files:
                     move('{}/{}'.format(os.getcwd(), file),
