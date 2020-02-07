@@ -84,7 +84,7 @@ class SequencingUpdate:
 
         return data, attachment_files, failed_samples
 
-    def update_mss_sheet(self, ss_conn, admin_info, sample_data, sheet_info_dict, failed_samples):
+    def update_mss_sheet(self, ss_conn, admin_info, sample_data, sheet_info_dict, failed_samples, s_status):
 
         total_samples = len(sample_data)
         print('\nSequence complete samples from illumina_info report: {}'.format(total_samples))
@@ -167,7 +167,8 @@ class SequencingUpdate:
                                 f_write.writerow(sample_data_dict)
                                 continue
 
-                            if sample_production_status != 'Sequencing Completed' or 'QC' not in sample_production_status:
+                            if sample_production_status != 'Sequencing Completed' or 'QC' not in \
+                                    sample_production_status:
                                 updated_samples += 1
 
                                 new_row = ss_conn.smart_sheet_client.models.Row()
@@ -175,8 +176,8 @@ class SequencingUpdate:
 
                                 new_cell = ss_conn.smart_sheet_client.models.Cell()
                                 new_cell.column_id = sheet_col_ids['Current Production Status']
-                                new_cell.value = 'Sequencing Completed'
-                                sample_data_dict['Current Production Status'] = 'Sequencing Completed'
+                                new_cell.value = s_status
+                                sample_data_dict['Current Production Status'] = s_status
                                 new_row.cells.append(new_cell)
 
                                 new_cell = ss_conn.smart_sheet_client.models.Cell()
@@ -257,7 +258,7 @@ class SequencingUpdate:
                         return admin_id
         return False
 
-    def pcc_update(self, ss_connector, pccs, woid, admin_info, sample_number, attachment):
+    def pcc_update(self, ss_connector, pccs, woid, admin_info, sample_number, attachment, s_status):
 
         # find last sibling row, insert row under sibling.
 
@@ -288,7 +289,7 @@ class SequencingUpdate:
                         "objectType": 'MULTI_CONTACT', 'values': [{'email': admin_info['user email'],
                                                                    'name': admin_info['user email']}]}})
         new_swo_row.cells.append({'column_id': col_dict['Event Date'], 'value': datetime.datetime.now().isoformat()})
-        new_swo_row.cells.append({'column_id': col_dict['Production Notes'], 'value': admin_info['Description']})
+        new_swo_row.cells.append({'column_id': col_dict['Production Notes'], 'value': s_status})
 
         if sibling_id:
             new_swo_row.sibling_id = sibling_id
