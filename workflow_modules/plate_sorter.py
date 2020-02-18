@@ -12,6 +12,7 @@ import smrtqc
 import argparse
 
 
+
 # Classes for plate building
 class sample:
     """Represents a single instance of a sample in the production pipeline"""
@@ -155,7 +156,7 @@ def main():
     """
     TODO: Refactor code into packages/modules to lessen the amount of code in this file
     TODO: Better output
-    TODO: Log failures
+    TODO: Log failures (using yaml.dump(obj) or json.dump(obj))
     """
     try:
 
@@ -403,16 +404,22 @@ def build_sample_objects(pipelines, bcs):
 
 def get_samp_names(samples):
     """
+    Generates sample inventory and uses imperfect sample names in the dilution drop-off to associate sample names with the correct sample
 
     :param samples:
     :return:
     """
     bcs = []
+    sample_names = []
+    samp_bad_name_dict = {}
+
+    # Get list of barcodes and generate sample inventory file
     for samp in samples:
         bcs.append(samp.bc)
     FNULL = open(os.devnull, 'w')
     subprocess.run(['limfo', 'bar', '-bc', ','.join(bcs), '--report', 'sample_inventory', '--format', 'tsv'], stdout=FNULL, stderr=subprocess.STDOUT)
 
+    # open inventory file and create list of good names
     with open('sample_inventory.tsv') as inv_file:
         next(inv_file)
 
@@ -420,10 +427,26 @@ def get_samp_names(samples):
         next(reader)
 
         for line in reader:
-            samples[int(line['#'])-1].name = line['DNA']
-        count = len(samples)
+            sample_names.append(line['DNA'])
 
-        print('   {} samples found.'.format(count))
+    # open dilution drop-off and create dictionary associate less than great name with sample barcode
+    with open('dilution_drop_off.tsv', 'r')as fin:
+        next(fin)
+
+        reader = csv.DictReader(fin, delimiter='\t')
+        next(reader)
+
+        for line in reader:
+            for samp in samples:
+                if samp.bc == line['Barcode']:
+                    samp_bad_name_dict[samp.bc] = line['Content_Desc'].split(' ')
+
+    # Use check imperfect names for good sample names and assign name if a match is found
+    for name in sample_names:
+        for samp in samples:
+            if name in samp_bad_name_dict[samp.bc]:
+                samp.name = name
+                break
 
 
 def get_bc_freezer_loc(barcodes, fl_reader):
@@ -1159,3 +1182,4 @@ def clean_up_workspace():
 
 if __name__ == '__main__':
     main()
+
