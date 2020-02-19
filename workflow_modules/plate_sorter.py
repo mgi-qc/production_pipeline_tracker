@@ -10,7 +10,7 @@ import datetime
 import subprocess
 import smrtqc
 import argparse
-
+import yaml
 
 
 # Classes for plate building
@@ -137,16 +137,21 @@ class Ffd:
             bin_value = 0
             for t in b:
                 bin_value += len(t.samples)
-            if bin_value + len(box.samples) < self.capacity:
+            if bin_value + len(box.samples) <= self.capacity:
                 b.append(box)
                 return bins
         bins.append([])
+
+        with open('logs/bins_dump.yaml', 'a') as fout:
+            fout.write('{}\n'.format(yaml.dump(bins)))
+
         self.add_to_bins(box, bins)
         return bins
 
     def ffd(self):
         """Initializes the recursive FFD algorithm"""
         bins = []
+
         for item in self.boxes:
             bins = self.add_to_bins(item, bins)
         return bins
@@ -399,6 +404,10 @@ def build_sample_objects(pipelines, bcs):
     print('- Getting sample names')
     get_samp_names(master_sample_list)
 
+    with open('logs/sample_dump.yaml','w') as fout:
+        for samp in master_sample_list:
+            fout.write('{}\n'.format(yaml.dump(samp)))
+
     return master_sample_list
 
 
@@ -492,6 +501,10 @@ def sort_to_current_plates(sample_list):
             master_plate[-1].wo.append(samp.work_order)
             master_plate[-1].samples.append(samp)
             samp.plate = master_plate[-1]
+
+    for plt in master_plate:
+        with open('logs/{}_plate_dump.yaml'.format(plt.name),'w') as fout:
+            fout.write('{}\n'.format(yaml.dump(plt)))
 
     return master_plate
 
@@ -611,7 +624,6 @@ def sort_to_outgoing_plates(plate_list):
     for pipe in pipeline_bin_dict:
 
         pipeline_bin_dict[pipe] = order_bins(pipeline_bin_dict[pipe])
-
         packed_plates = Ffd(96, pipeline_bin_dict[pipe])
 
         packed_plates = packed_plates.ffd()
@@ -627,6 +639,7 @@ def sort_to_outgoing_plates(plate_list):
         outgoing_plates.extend(combined_plates)
 
     # rename plates based on work orders and FFPE present
+    # removed
 
     # Pass list of outgoing plates back to main
     return outgoing_plates
