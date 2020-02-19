@@ -151,8 +151,7 @@ class Ffd:
     def ffd(self):
         """Initializes the recursive FFD algorithm"""
         bins = []
-        for i in self.boxes:
-            print(len(i.samples))
+
         for item in self.boxes:
             bins = self.add_to_bins(item, bins)
         return bins
@@ -625,7 +624,6 @@ def sort_to_outgoing_plates(plate_list):
     for pipe in pipeline_bin_dict:
 
         pipeline_bin_dict[pipe] = order_bins(pipeline_bin_dict[pipe])
-        print(pipeline_bin_dict[pipe])
         packed_plates = Ffd(96, pipeline_bin_dict[pipe])
 
         packed_plates = packed_plates.ffd()
