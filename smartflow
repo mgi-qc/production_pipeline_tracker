@@ -160,7 +160,7 @@ def create_mss_sheet_name(admin_name):
     added_words = 0
     for i, word in enumerate(admin_name.split()):
         if added_words <= 4:
-            if word[0].upper().isalpha():
+            if word[0].upper():
                 added_words += 1
                 new_string += '{} '.format(word)
 
