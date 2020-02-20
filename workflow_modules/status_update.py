@@ -20,11 +20,12 @@ class SampleUpdate:
                           'WO Facilitator',
                           'Billing Acct Name',
                           'Administration Project'
+                          'Attempted Coverage',
                           'Facilitator Comment',
-                          'Is For CLE?'
-                          'Topup']
+                          'Is For CLE?']
 
-    date_columns = ['RWOID Creation Date',
+    date_columns = ['Sample Received Date',
+                    'RWOID Creation Date',
                     'WOID Creation Date',
                     'Resource Assessment Completed Date',
                     'Lib Core Start Date',
@@ -79,6 +80,10 @@ class SampleUpdate:
 
         for date_col in self.date_columns:
             new_sheet['columns'].append({'title': date_col, 'type': 'DATE'})
+
+        new_sheet['columns'].append({'title': 'Duration', 'type': 'TEXT_NUMBER'})
+        new_sheet['columns'].append({'title': 'Topup', 'type': 'CHECKBOX', 'width': 60})
+        new_sheet['columns'].append({'title': 'Launched', 'type': 'CHECKBOX', 'width': 60})
 
         sheet_spec = self.ss_connector.smart_sheet_client.models.Sheet(new_sheet)
 
@@ -198,7 +203,8 @@ class SampleUpdate:
                             append_cell.column_id = cell.column_id
                             append_cell.value = self.project_info['Work Order ID']
                             append_cell.hyperlink = {
-                                'url': 'https://imp-lims.ris.wustl.edu/entity/setup-work-order/{}'.format(row_woid)}
+                                'url': 'https://imp-lims.ris.wustl.edu/entity/setup-work-order/{}'.format(
+                                    self.project_info['Work Order ID'])}
                             new_sibling_row.cells.append(append_cell)
 
                             if row_woid == self.field_values['Work Order ID'] or row_woid == 'NA':

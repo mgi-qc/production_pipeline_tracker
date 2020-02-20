@@ -20,10 +20,12 @@ class sampleUpdate:
                           'WO Facilitator',
                           'Billing Acct Name',
                           'Administration Project',
+                          'Attempted Coverage',
                           'Facilitator Comment',
                           'Is For CLE?']
 
-    date_columns = ['RWOID Creation Date',
+    date_columns = ['Sample Received Date',
+                    'RWOID Creation Date',
                     'WOID Creation Date',
                     'Resource Assessment Completed Date',
                     'Lib Core Start Date',
@@ -82,6 +84,7 @@ class sampleUpdate:
         for date_col in self.date_columns:
             new_sheet['columns'].append({'title': date_col, 'type': 'DATE'})
 
+        new_sheet['columns'].append({'title': 'Duration', 'type': 'TEXT_NUMBER'})
         new_sheet['columns'].append({'title': 'Topup', 'type': 'CHECKBOX', 'width': 60})
         new_sheet['columns'].append({'title': 'Launched', 'type': 'CHECKBOX', 'width': 60})
 
