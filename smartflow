@@ -562,8 +562,10 @@ def main():
             script_flag = ['-c']
         if args.pb:
             script = script_dict['pb']
+            script_flag = False
         if args.rba:
             script = script_dict['rba']
+            script_flag = False
 
         # Set working directories and dev flags
         if args.dev:
