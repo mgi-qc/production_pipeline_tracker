@@ -92,6 +92,7 @@ def get_total_dna_needed():
     req_list = [min_req, std_req]
     return req_list
 
+
 def make_std_file(inventory_file):
     """
 
@@ -329,11 +330,14 @@ def update_samples(inv_std, sample_sheets, woid, std_dna_req, min_dna_req, op_sp
 
 def build_assessment_report(counts, std_req, min_req, proj_info):
     """
-    TODO: Get info needed:
-    TODO: - Sequenceing plan - Input?
-    TODO: Add report to smartsheet, make file for report
-    """
+    Make assessment report to be attached to smartsheet
 
+    :param counts: counts for samples passing min/std req dna
+    :param std_req: std req dna amount for sample to pass
+    :param min_req: min req dna amount for sample to pass
+    :param proj_info: dictionary of project information
+    :return: assessment file name
+    """
     comments = ''
     total = 0
     for item in counts:
@@ -352,12 +356,12 @@ def build_assessment_report(counts, std_req, min_req, proj_info):
              '\t- # Samples Failed (less than 50ng): {fails}\n' \
              '\n' \
              '\t- Comments: {comment}'.format(
-            total=total,pipeline=proj_info['pipeline'],
-            std_req=std_req, std_pass=counts['std_pass'],
-            min_req=min_req, min_pass=counts['min_pass'],
-            olmin=min_req - 1, min_fail=counts['fail_min'],
-            fails=counts['fails'],
-            comment=comments)
+              total=total, pipeline=proj_info['pipeline'],
+              std_req=std_req, std_pass=counts['std_pass'],
+              min_req=min_req, min_pass=counts['min_pass'],
+              olmin=min_req - 1, min_fail=counts['fail_min'],
+              fails=counts['fails'],
+              comment=comments)
 
     report_file = '{desc}.txt'.format(desc=proj_info['description'].replace(' ', '_'))
 
