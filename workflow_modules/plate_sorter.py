@@ -48,7 +48,7 @@ class plate:
         # Outgoing pipeline of the samples in the plate (Outgoing only!)
         self.pipe = ''
 
-    """Most of these functions are not used, it is possible they could be utiilized to streamline some of this code"""
+    """Most of these functions are not used, most of them are left from a legacy version which was written with Java like getters and setters in mind"""
     def set_name(self, name):
         self.name = name
         return None
@@ -142,7 +142,7 @@ class Ffd:
                 return bins
         bins.append([])
 
-        with open('logs/bins_dump.yaml', 'a') as fout:
+        with open('logs/{}_bins_dump.yaml'.format(datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")), 'a') as fout:
             fout.write('{}\n'.format(yaml.dump(bins)))
 
         self.add_to_bins(box, bins)
@@ -159,9 +159,12 @@ class Ffd:
 
 def main():
     """
-    TODO: Refactor code into packages/modules to lessen the amount of code in this file
-    TODO: Better output
-    TODO: Log failures (using yaml.dump(obj) or json.dump(obj))
+    TODO:
+    TODO: Refactor code into packages/modules to lessen the amount of code in this file: Will import sample, plate, and work order from one package, FFD from another
+    TODO: Better output: Add work orders being added, samples per wo, pipeline; plates added with no. samples per;
+    TODO: Add date to yaml logs; Possibly seperate direcotrory
+    TODO: Add check on DNA per pipeline 450 for WGS and ?250 for exome (LOW PRIORITY)
+
     """
     try:
 
@@ -209,6 +212,7 @@ def main():
 
         # Update SmartSheets
         update_smart_sheets(sample_master_list, outgoing_plates, ss_client)
+
     finally:
 
         # Update FFPE file
@@ -404,7 +408,7 @@ def build_sample_objects(pipelines, bcs):
     print('- Getting sample names')
     get_samp_names(master_sample_list)
 
-    with open('logs/sample_dump.yaml','w') as fout:
+    with open('logs/{}_sample_dump.yaml'.format(datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")), 'w') as fout:
         for samp in master_sample_list:
             fout.write('{}\n'.format(yaml.dump(samp)))
 
@@ -503,7 +507,7 @@ def sort_to_current_plates(sample_list):
             samp.plate = master_plate[-1]
 
     for plt in master_plate:
-        with open('logs/{}_plate_dump.yaml'.format(plt.name),'w') as fout:
+        with open('logs/{t}_{p}_plate_dump.yaml'.format(t=datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"), p=plt.name), 'w') as fout:
             fout.write('{}\n'.format(yaml.dump(plt)))
 
     return master_plate
