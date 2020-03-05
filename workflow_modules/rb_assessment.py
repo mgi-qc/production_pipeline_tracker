@@ -11,7 +11,6 @@ import smrtqc
 import argparse
 
 
-# Misc Functions
 def is_num(s):
     """
     Returns True if object can be cast as an int, False if not
@@ -49,18 +48,20 @@ def get_wo_id():
             print('Workorders must be made up of numbers only!')
         else:
             return wo_in
-        print('Try Again: ')
+
         if try_count % 5 == 0 and try_count > 0:
             print('Please enter the Resource Bank work order id: ')
+        else:
+            print('Try Again: ')
         try_count += 1
 
 
 def get_total_dna_needed():
     """"
     Get and check minimum and standard amount of dna required for pass/borderline/fail from user input
-
     :return: min_req, std_req : tuple of minimum and standard amount of dna required for pass/borderline/fail
     """
+
     print('Please enter the minimum amount of dna needed for the sample to pass(in ng): ')
 
     while True:
@@ -77,13 +78,19 @@ def get_total_dna_needed():
     while True:
         std_req = input()
 
-        if is_num(std_req) and float(std_req) > 0:
-            std_req = float(std_req)
-            break
+        if is_num(std_req):
+            if float(std_req) > 0 and float(std_req) > min_req:
+                std_req = float(std_req)
+                break
+            elif float(std_req) < float(min_req):
+                print('Standard DNA amount required must be greater that the minimum')
+            else:
+                print('Please enter a positive number: ')
         else:
             print('Please enter a positive number: ')
 
-        return min_req, std_req
+    req_list = [min_req, std_req]
+    return req_list
 
 
 def make_std_file(inventory_file):
@@ -105,42 +112,61 @@ def make_std_file(inventory_file):
     return inventory_std
 
 
-def get_project_name(inventory_file):
+def get_project_info(inventory_file):
+    """
+    Make dictionary
+    :param inventory_file:
+    :return:
     """
 
-    :param inventory_file: name of inventory file from LIMS
-    :return: Admin Project name
-    """
+    project_dictionary = {}
+
     with open(inventory_file, 'r') as in_file:
-        i = 0
-        while i < 6:
-            next(in_file)
-            i += 1
 
-        admin_line = in_file.readline()
-        if 'Administration Project' in admin_line:
-            name = admin_line.split('\t')[1].strip().replace('"', '')
-        else:
-            exit('Unexpected Administration Project Location!')
+        for line in in_file:
 
-        return name
+            if 'Administration Project' in line:
+                project_dictionary['name'] = line.split('\t')[1].strip().replace('"', '')
+            elif 'Description:' in line:
+                project_dictionary['description'] = line.split('\t')[1].replace('"', '')
+            elif 'Pipeline' in line:
+                project_dictionary['pipeline'] = line.split('\t')[1].replace('"', '')
+        return project_dictionary
 
 
-def check_dna(total_dna, req_dna):
+
+
+def check_dna(total_dna, min_dna_req):
     """
-    TODO: Check both std and min req dna
 
     :param total_dna: total dna assessed
     :param req_dna: dna required for pass
     :return: Pass or fail output
     """
     if is_num(total_dna):
-        if float(total_dna) > float(req_dna):
+        if float(total_dna) > float(min_dna_req):
             return 'Resource Assessment Pass'
         else:
             return 'Resource Assessment Fail'
+
     else:
         return 'Resource Assessment Complete'
+
+
+def update_counts(total_dna, counts, std_dna_req, min_dna_req):
+
+    if is_num(total_dna):
+        total_dna = float(total_dna)
+        if total_dna > std_dna_req:
+            counts['std_pass'] += 1
+        else:
+            if total_dna > min_dna_req:
+                counts['min_pass'] += 1
+            else:
+                if total_dna > 50:
+                    counts['fail_min'] += 1
+                else:
+                    counts['fails'] += 1
 
 
 def get_sample_row_sheet(line_dict, sample_sheets, wo):
@@ -178,7 +204,7 @@ def check_row_for_sample(sample, row, column_ids, woid):
     sample_found = False
 
     for cell in row.cells:
-        if cell.column_id == column_ids['Resource Work Order']:
+        if cell.column_id == column_ids['Resource Storage']:
             if cell.value == woid:
                 wo_found = True
 
@@ -211,7 +237,7 @@ def check_header(given_header):
             sys.exit('Unexpected header!')
 
 
-def add_comment_to_PCC(prod_space, woid, ss_connector):
+def add_report_to_PCC(prod_space, woid, ss_connector, report_file):
     """
     Add comment to Production Communications Center Sheet in Production Workspace
 
@@ -234,35 +260,123 @@ def add_comment_to_PCC(prod_space, woid, ss_connector):
     # Graciously provided by @ltrani
     comment = input('\nAdd comment to Resource Bank Work Order in PCC (Enter to continue without comment):\n')
     # comment = 'Making some comments yo'
-    if comment:
-        ss_connector.smart_sheet_client.Discussions.create_discussion_on_row(prod_comm_sheet.id, wo_row.id,
-                                                                             ss_connector.smart_sheet_client.models.
-                                                                             Discussion({'comment': ss_connector.
-                                                                                        smart_sheet_client.models.
-                                                                                        Comment({'text': comment})}))
+    # debug if comment:
+    #     pass
+    #     ss_connector.smart_sheet_client.Discussions.create_discussion_on_row(prod_comm_sheet.id, wo_row.id,
+    #                                                                          ss_connector.smart_sheet_client.models.
+    #                                                                          Discussion({'comment': ss_connector.
+    #                                                                                     smart_sheet_client.models.
+    #                                                                                     Comment({'text': comment})}))
+    # Attach report to resource work order
+    attached_file = ss_connector.smart_sheet_client.Attachments.attach_file_to_row(prod_comm_sheet.id, wo_row.id, (report_file, open(report_file), 'rb'))
 
 
-def build_assement_report():
+def update_samples(inv_std, sample_sheets, woid, std_dna_req, min_dna_req, op_space, ss_client, proj_info):
+
+    counts = {'std_pass': 0,
+              'min_pass': 0,
+              'fail_min': 0,
+              'fails': 0}
+
+    with open(inv_std, 'r') as inventory_file:
+        reader = csv.DictReader(inventory_file, delimiter='\t')
+        header = reader.fieldnames
+
+        check_header(header)
+
+        # dict of lists of rows to update using sheet id as header
+        rows_to_update = {}
+        count = 0
+
+        date = datetime.now().strftime('%Y-%m-%d')
+
+        # iterate over samples, assess pass/fails, and load results into smartsheet
+        for line in reader:
+
+            row, sheet, column_ids = get_sample_row_sheet(line, sample_sheets, woid)
+            update_counts(total_dna=line['Total_DNA (ng)'], counts=counts, std_dna_req=std_dna_req, min_dna_req=min_dna_req)
+            if row == 0 and column_ids == 0 and sheet == 0:
+
+                print(line['Content_Desc'] + ' not found in sample sheets in Smartsheet.')
+
+            else:
+
+                assessment_cell = smartsheet.smartsheet.models.Cell()
+                assessment_cell.column_id = column_ids['Resource Assessment Completed Date']
+                assessment_cell.value = date
+
+                pass_fail_cell = smartsheet.smartsheet.models.Cell()
+                pass_fail_cell.column_id = column_ids['Current Production Status']
+
+                pass_fail_cell.value = check_dna(total_dna=line['Total_DNA (ng)'], min_dna_req=min_dna_req)
+
+                new_row = smartsheet.smartsheet.models.Row()
+                new_row.id = row.id
+                new_row.cells.append(assessment_cell)
+                new_row.cells.append(pass_fail_cell)
+                if sheet.id in rows_to_update:
+                    rows_to_update[sheet.id].append(new_row)
+                else:
+                    rows_to_update[sheet.id] = [new_row]
+                count += 1
+
+    for sid in rows_to_update:
+        updated_rows = ss_client.smart_sheet_client.Sheets.update_rows(sid, rows_to_update[sid])
+
+    report_file = build_assessment_report(counts, std_dna_req, min_dna_req, proj_info)
+
+    return report_file
+
+
+def build_assessment_report(counts, std_req, min_req, proj_info):
     """
-    TODO: Get info needed:
-    TODO: - Total # of Samples
-    TODO: - Sequenceing plan
-    TODO: - # samples passed from standard
-    TODO: - # samples passed on minimum
-    TODO: - # samples failing min
-    TODO: - # samples failed(less than 50)
-    TODO: build template or hardcode template for output
+    Make assessment report to be attached to smartsheet
 
-
+    :param counts: counts for samples passing min/std req dna
+    :param std_req: std req dna amount for sample to pass
+    :param min_req: min req dna amount for sample to pass
+    :param proj_info: dictionary of project information
+    :return: assessment file name
     """
+    comments = ''
+    total = 0
+    for item in counts:
+        total += counts[item]
+
+    report = 'Hello,\n' \
+             '\n' \
+             'The assessment is complete and the new work order has been updated.\n' \
+             '\n' \
+             'DNA available for Sequencing Plan/Additional DNA request: \n' \
+             '\t- Total # of Samples: {total}' \
+             '\t- Suggested Sequencing Plan: {pipeline}' \
+             '\t- # Samples Passed Based on Seq Plan Standard Amts ({std_req} ng): {std_pass}\n' \
+             '\t- # Samples Passed Based on Seq Plan Min. Amts ({min_req} ng): {min_pass}\n' \
+             '\t- # Samples Failed, Not Meeting Seq Plan Min. Amts(50-{olmin} ng): {min_fail}\n' \
+             '\t- # Samples Failed (less than 50ng): {fails}\n' \
+             '\n' \
+             '\t- Comments: {comment}'.format(
+              total=total, pipeline=proj_info['pipeline'],
+              std_req=std_req, std_pass=counts['std_pass'],
+              min_req=min_req, min_pass=counts['min_pass'],
+              olmin=min_req - 1, min_fail=counts['fail_min'],
+              fails=counts['fails'],
+              comment=comments)
+
+    report_file = '{desc}.txt'.format(desc=proj_info['description'].replace(' ', '_'))
+
+    with open(report_file.format(), 'w') as fout:
+        fout.write(report)
+
+    return report_file
+
 
 def main():
     """
-    TODO: Build report from template provided
     TODO: Add report to smartsheet resource work order row in PCC
     TODO: Mark failed samples in smartsheet to kick off workflow
-    TODO: Check desired smaple status for passing vs failed
     """
+
     # Set dev option
     parser = argparse.ArgumentParser()
     parser.add_argument('-dev', help='Used for development and testing purposes', action='store_true')
@@ -276,7 +390,9 @@ def main():
 
     # get RB work order and Pass/Fail conditions from input
     woid = get_wo_id()
-    min_dna_req, std_dna_req = get_total_dna_needed()
+    req_list = get_total_dna_needed()
+    min_dna_req = req_list[0]
+    std_dna_req = req_list[1]
 
     # get info from lims using query
     print('Getting Inventory Sheet from LIMS...')
@@ -288,13 +404,15 @@ def main():
         exit('Inventory file not found!')
 
     # convert tsv with ugly stuff at top to only header and rows
+    # TODO This needs to be removed and the header should be handled wherever the sheet is read in
     inv_file = 'inventory.tsv'
     inv_std = make_std_file(inv_file)
 
     # get project name from inventory file
-    proj_name = get_project_name(inv_file)
+    proj_info = get_project_info(inv_file)
 
     # Use nice std tsv to read in data
+    # TODO - use sheet produced by query and hanlde file header here
     inv_temp = inv_file.split('.')[0] + '_temp.' + inv_file.split('.')[1]
 
     # get sample sheets using project name
@@ -314,7 +432,7 @@ def main():
 
     # get project samples folder
     for folder in active_folder.folders:
-        if folder.name == proj_name:
+        if folder.name == proj_info['name']:
             samp_folder = ss_client.get_object(folder.id, 'f')
 
     sample_sheets = []
@@ -328,53 +446,10 @@ def main():
 
     # Search sheets for samples and update with assessed dna and status
     print('Updating Smartsheet')
+    report_file = update_samples(inv_std, sample_sheets, woid, std_dna_req, min_dna_req, op_space, ss_client, proj_info)
 
-    with open(inv_std, 'r') as inventory_file:
-        reader = csv.DictReader(inventory_file, delimiter='\t')
-        header = reader.fieldnames
-
-        check_header(header)
-
-        # dict of lists of rows to update using sheet id as header
-        rows_to_update = {}
-        count = 0
-
-        date = datetime.now().strftime('%Y-%m-%d')
-
-        # iterate over samples, assess pass/fails, and load results into smartsheet
-        for line in reader:
-
-            row, sheet, column_ids = get_sample_row_sheet(line, sample_sheets, woid)
-            if row == 0 and column_ids == 0 and sheet == 0:
-
-                print(line['Content_Desc'] + ' not found in sample sheets in Smartsheet.')
-
-            else:
-
-                assessment_cell = smartsheet.smartsheet.models.Cell()
-                assessment_cell.column_id = column_ids['Resource Assessment Completed Date']
-                assessment_cell.value = date
-
-                pass_fail_cell = smartsheet.smartsheet.models.Cell()
-                pass_fail_cell.column_id = column_ids['Current Production Status']
-
-                pass_fail_cell.value = check_dna(total_dna=line['Total_DNA (ng)'], req_dna=total_dna_req)
-
-                new_row = smartsheet.smartsheet.models.Row()
-                new_row.id = row.id
-                new_row.cells.append(assessment_cell)
-                new_row.cells.append(pass_fail_cell)
-                if sheet.id in rows_to_update:
-                    rows_to_update[sheet.id].append(new_row)
-                else:
-                    rows_to_update[sheet.id] = [new_row]
-                count += 1
-
-    for sid in rows_to_update:
-
-        updated_rows = ss_client.smart_sheet_client.Sheets.update_rows(sid, rows_to_update[sid])
-
-    add_comment_to_PCC(op_space, woid, ss_client)
+    # Add report to work order row in Production Communication Center
+    add_report_to_PCC(op_space, woid, ss_client, report_file)
 
     # remove temps
     os.remove(inv_std)
