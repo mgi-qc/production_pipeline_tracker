@@ -36,6 +36,7 @@ class SampleUpdate:
                     'Sequencing Completed Date',
                     'QC Start',
                     'QC Completed Date',
+                    'Data Transfer Hand Off Date',
                     'Data Transfer Completed Date']
 
     def __init__(self, ss_conn=None, sheet_dict=None, samples=None, project_info=None, date=None):
@@ -84,6 +85,7 @@ class SampleUpdate:
         new_sheet['columns'].append({'title': 'Duration', 'type': 'TEXT_NUMBER'})
         new_sheet['columns'].append({'title': 'Topup', 'type': 'CHECKBOX', 'width': 60})
         new_sheet['columns'].append({'title': 'Launched', 'type': 'CHECKBOX', 'width': 60})
+        new_sheet['columns'].append({'title': 'Data Transfer Completed', 'type': 'CHECKBOX', 'width': 60})
 
         sheet_spec = self.ss_connector.smart_sheet_client.models.Sheet(new_sheet)
 
