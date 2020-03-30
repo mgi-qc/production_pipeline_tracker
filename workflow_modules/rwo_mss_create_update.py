@@ -29,6 +29,7 @@ class sampleUpdate:
                     'WOID Creation Date',
                     'Resource Assessment Completed Date',
                     'Lib Core Start Date',
+                    'New Library Needed',
                     'Capture drop off date',
                     'qPCR drop off date',
                     'Initial Sequencing Scheduled Date',
@@ -73,6 +74,7 @@ class sampleUpdate:
         new_sheet['columns'].append({'title': 'Fail', 'type': 'CHECKBOX', 'symbol': 'FLAG', 'width': 5.33})
         new_sheet['columns'].append({'title': 'Re-attempt', 'type': 'PICKLIST', 'symbol': 'DECISION_SYMBOLS',
                                      'width': 60})
+        new_sheet['columns'].append({'title': 'Aliquot Requested', 'type': 'CHECKBOX', 'width': 70})
 
         for col in self.new_column_headers:
             if col == 'Sample Full Name':
