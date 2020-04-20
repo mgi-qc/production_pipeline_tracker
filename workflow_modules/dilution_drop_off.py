@@ -136,6 +136,7 @@ class Ddo:
 
                     row_woid = False
                     row_sample = False
+                    qc_pass = False
 
                     for cell in row.cells:
                         if cell.column_id == sheet_col_ids['Work Order ID']:
@@ -148,7 +149,11 @@ class Ddo:
                             if cell.value in samples:
                                 row_sample = True
 
-                    if row_woid and row_sample:
+                        if cell.column_id == sheet_col_ids['Current Production Status']:
+                            if cell.value == 'QC Pass':
+                                qc_pass = True
+
+                    if row_woid and row_sample and not qc_pass:
 
                         match.append('True: {} {}'.format(rw, rs))
 
