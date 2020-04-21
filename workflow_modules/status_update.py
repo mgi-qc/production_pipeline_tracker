@@ -50,7 +50,7 @@ class SampleUpdate:
         status = self.project_info['Pipeline']
         if 'sequencing' in self.project_info['Pipeline'].lower():
             status = 'Resource Assessment Pass'
-        self.field_values = {'Work Order ID': self.project_info['Work Order ID'],
+        self.field_values = {'Work Order ID': str(self.project_info['Work Order ID']),
                              'Current Production Status': status,
                              'Pipeline': self.project_info['Pipeline'],
                              'WOI Status': self.project_info['Status'],
@@ -205,10 +205,10 @@ class SampleUpdate:
 
                             append_cell = self.ss_connector.smart_sheet_client.models.Cell()
                             append_cell.column_id = cell.column_id
-                            append_cell.value = self.project_info['Work Order ID']
+                            append_cell.value = str(self.project_info['Work Order ID'])
                             append_cell.hyperlink = {
                                 'url': 'https://imp-lims.ris.wustl.edu/entity/setup-work-order/{}'.format(
-                                    self.project_info['Work Order ID'])}
+                                    str(self.project_info['Work Order ID']))}
                             new_sibling_row.cells.append(append_cell)
 
                             if row_woid == self.field_values['Work Order ID'] or row_woid == 'NA':
@@ -244,9 +244,9 @@ class SampleUpdate:
                         if cell.column_id == sheet_column_ids['Resource Storage']:
                             new_cell = self.ss_connector.smart_sheet_client.models.Cell()
                             new_cell.column_id = sheet_column_ids['Resource Storage']
-                            new_cell.value = cell.value
+                            new_cell.value = str(cell.value)
                             new_cell.hyperlink = {
-                                'url': 'https://imp-lims.ris.wustl.edu/entity/setup-work-order/{}'.format(cell.value)}
+                                'url': 'https://imp-lims.ris.wustl.edu/entity/setup-work-order/{}'.format(str(cell.value))}
                             new_sibling_row.cells.append(new_cell)
                             continue
 
@@ -306,9 +306,10 @@ class SampleUpdate:
                             if field == 'Work Order ID':
                                 new_cell = self.ss_connector.smart_sheet_client.models.Cell()
                                 new_cell.column_id = sheet_column_ids[field]
-                                new_cell.value = value
+                                new_cell.value = str(value)
                                 new_cell.hyperlink = {
-                                    'url': 'https://imp-lims.ris.wustl.edu/entity/setup-work-order/{}'.format(value)}
+                                    'url': 'https://imp-lims.ris.wustl.edu/entity/setup-work-order/{}'
+                                        .format(str(int(value)))}
                                 new_row.cells.append(new_cell)
                                 continue
 
