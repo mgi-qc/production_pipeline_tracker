@@ -185,7 +185,7 @@ if args.w:
 
 def main():
 
-    if (args.f or args.w) and (args.add or args.update or args.s or args.si):
+    if (args.f or args.w) and (args.add or args.update):
         count = 0
         for woid in woids:
             print('\n**********\nStarting update on {}:\n'.format(woid))
@@ -354,71 +354,75 @@ def main():
 
                 print('\nSmartsheet resource work order tracking updates complete.')
 
-            if args.s or args.si:
+            # if args.s or args.si:
+            #
+            #     sequence_complete_status = 'Sequencing Completed'
+            #     if args.si:
+            #         sequence_complete_status = 'Initial Sequencing Completed'
+            #
+            #     print('Processing {} for Smartsheet tracking'.format(woid))
+            #
+            #     pcc = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+            #     i = sequence_complete.SequencingUpdate()
+            #
+            #     # get project hub, production communication sheets
+            #     ph, pccs = get_project_hub(pcc)
+            #
+            #     print('Generating illumina_info report')
+            #
+            #     total_kb_cutoff = 63000000
+            #     if args.tkb:
+            #         total_kb_cutoff = args.tkb
+            #
+            #     sample_data, outfiles, failed_samples = i.illumina_info(woid=woid, cutoff=total_kb_cutoff)
+            #
+            #     if not sample_data:
+            #         print('illumina_info query failed to return samples.')
+            #         continue
+            #
+            #     print('\n{} Samples from illumina_info sequence complete'.format(len(sample_data)))
+            #
+            #     # get admin info
+            #     w = woInfo.woInfo(woid)
+            #     admin_info = w.get_admin()
+            #
+            #     print('\nWork Order Billing Information:')
+            #     for k, v in admin_info.items():
+            #         print('{}: {}'.format(k, v))
+            #
+            #     # init smartsheet connection
+            #     print('\nUpdating MSS sheets:')
+            #     # get mss sheets
+            #     s = smrtqc.SmartQC(os.environ.get('SMRT_API'))
+            #     admin_info['user email'] = update_admin_email(s, admin_info['Facilitator'])
+            #     smartsheet_mss_sample_sheets = get_sample_sheet(s, admin_info['Administration Project'], update=True)
+            #     updated_sample_num, attachments = i.update_mss_sheet(ss_conn=s, admin_info=admin_info,
+            #                                                          sample_data=sample_data,
+            #                                                          sheet_info_dict=smartsheet_mss_sample_sheets,
+            #                                                          failed_samples=failed_samples,
+            #                                                          s_status=sequence_complete_status)
+            #
+            #     upload_files = []
+            #     for file in outfiles + attachments:
+            #         f_line_number = sum(1 for line in open(file))
+            #         if f_line_number == 1:
+            #             os.remove(file)
+            #         else:
+            #             upload_files.append(file)
+            #
+            #     # exit()
+            #     i.pcc_update(ss_connector=pcc, pccs=pccs, woid=woid, admin_info=admin_info,
+            #                  sample_number=updated_sample_num, attachment=upload_files,
+            #                  s_status=sequence_complete_status)
+            #
+            #     for file in upload_files:
+            #         move('{}/{}'.format(os.getcwd(), file),
+            #              '/gscmnt/gc2746/production/smartflow/production_files/sequence_complete/{}'.format(file))
+            #     print('illumina_info process status: {} samples Sequence Complete'.format(updated_sample_num))
 
-                sequence_complete_status = 'Sequencing Completed'
-                if args.si:
-                    sequence_complete_status = 'Initial Sequencing Completed'
-
-                print('Processing {} for Smartsheet tracking'.format(woid))
-
-                pcc = smrtqc.SmartQC(os.environ.get('SMRT_API'))
-                i = sequence_complete.SequencingUpdate()
-
-                # get project hub, production communication sheets
-                ph, pccs = get_project_hub(pcc)
-
-                print('Generating illumina_info report')
-
-                total_kb_cutoff = 63000000
-                if args.tkb:
-                    total_kb_cutoff = args.tkb
-
-                sample_data, outfiles, failed_samples = i.illumina_info(woid=woid, cutoff=total_kb_cutoff)
-
-                if not sample_data:
-                    print('illumina_info query failed to return samples.')
-                    continue
-
-                print('\n{} Samples from illumina_info sequence complete'.format(len(sample_data)))
-
-                # get admin info
-                w = woInfo.woInfo(woid)
-                admin_info = w.get_admin()
-
-                print('\nWork Order Billing Information:')
-                for k, v in admin_info.items():
-                    print('{}: {}'.format(k, v))
-
-                # init smartsheet connection
-                print('\nUpdating MSS sheets:')
-                # get mss sheets
-                s = smrtqc.SmartQC(os.environ.get('SMRT_API'))
-                admin_info['user email'] = update_admin_email(s, admin_info['Facilitator'])
-                smartsheet_mss_sample_sheets = get_sample_sheet(s, admin_info['Administration Project'], update=True)
-                updated_sample_num, attachments = i.update_mss_sheet(ss_conn=s, admin_info=admin_info,
-                                                                     sample_data=sample_data,
-                                                                     sheet_info_dict=smartsheet_mss_sample_sheets,
-                                                                     failed_samples=failed_samples,
-                                                                     s_status=sequence_complete_status)
-
-                upload_files = []
-                for file in outfiles + attachments:
-                    f_line_number = sum(1 for line in open(file))
-                    if f_line_number == 1:
-                        os.remove(file)
-                    else:
-                        upload_files.append(file)
-
-                # exit()
-                i.pcc_update(ss_connector=pcc, pccs=pccs, woid=woid, admin_info=admin_info,
-                             sample_number=updated_sample_num, attachment=upload_files,
-                             s_status=sequence_complete_status)
-
-                for file in upload_files:
-                    move('{}/{}'.format(os.getcwd(), file),
-                         '/gscmnt/gc2746/production/smartflow/production_files/sequence_complete/{}'.format(file))
-                print('illumina_info process status: {} samples Sequence Complete'.format(updated_sample_num))
+    if args.s:
+        subprocess.run(['python3',
+                        '/gscmnt/gc2746/production/smartflow/bin/workflow_modules/new_sequencing_complete.py'])
 
     if args.ss:
 

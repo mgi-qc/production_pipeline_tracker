@@ -239,7 +239,7 @@ class Ddo:
             {'column_id': col_dict['Reporting Instance'], 'value': ddo_title})
         new_title_row.cells.append({'column_id': col_dict['Items'], 'value': total_samples})
         new_title_row.cells.append({'column_id': col_dict['Failure'], 'value': failures})
-        new_title_row.to_bottom = True
+        new_title_row.to_top = True
         new_title_row.parent_id = qpcr_parent
 
         new_title_row_response = ss_connector.smart_sheet_client.Sheets.add_rows(sheet.id, [new_title_row])
