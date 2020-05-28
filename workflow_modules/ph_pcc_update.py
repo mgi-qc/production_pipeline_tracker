@@ -223,7 +223,7 @@ class phRowUpdate:
                     new_rba_row.cells.append(
                         {'column_id': self.col_dict['Production Notes'], 'value': 'Smartflow Initiation'})
                     new_rba_row.cells.append({'column_id': self.col_dict['Items'], 'value': 0})
-                    new_rba_row.to_bottom = True
+                    new_rba_row.to_top = True
                     new_rba_row.parent_id = row.id
 
                     response = ss_connector.smart_sheet_client.Sheets.add_rows(self.sheet.id, [new_rba_row])
