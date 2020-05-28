@@ -4,22 +4,6 @@
 This wrapper script MUST be run on a docker image with access to lims commands
 """
 
-"""
-Template for fails:
-new_cell = ss_conn.smart_sheet_client.models.Cell()
-new_cell.column_id = sheet_col_ids['Fail']
-new_cell.value = True
-new_row.cells.append(new_cell)
-
-new_cell = ss_conn.smart_sheet_client.models.Cell()
-new_cell.column_id = sheet_col_ids['Current Production Status']
-new_cell.value = 'qPCR Failed'
-# turned off red cell color
-# new_cell.format_ = ",,,,,,,,,27,,,,,,"
-new_row.cells.append(new_cell)
-
-"""
-
 import smartsheet
 import sys
 import os
@@ -105,7 +89,7 @@ def load_dropoff_into_smartsheet(dropoff_sheet, wo_sheet, info, smartsheet_obj, 
     # Build new cells for
     new_row = smartsheet.smartsheet.models.Row()
     new_row.parent_id = header_row.id
-    new_row.to_bottom = True
+    new_row.to_top = True
     new_row.cells.append({'column_id': column_ids['Reporting Instance'], 'value': info['Title']})
     new_row.cells.append({'column_id': column_ids['Sequencing Work Order'], 'value': ', '.join(info['Outgoing Queue Work Order'])})
     new_row.cells.append({'column_id': column_ids['Admin Project'], 'value': ', '.join(info['Administration Project'])})
@@ -191,7 +175,7 @@ def send_get_sheets(file):
 
     print('Getting Work Order report:')
     # barcode_info -r work_order -bc-file ~/barcode.fof -format tsv
-    subprocess.run(['barcode_info', '-r', 'work_order','--bc-file', file, '-format', 'tsv'])
+    subprocess.run(['barcode_info', '-r', 'work_order', '--bc-file', file, '-format', 'tsv'])
 
     # Check for files before continuing
     if not os.path.exists('work_order.tsv'):
@@ -212,7 +196,7 @@ def get_sample_inventories(admin_dict):
 
     for admin in admin_dict:
         for wo in admin_dict[admin]:
-            subprocess.run(['barcode_info', '--report', 'sample_inventory', '--bc', ','.join(admin_dict[admin][wo]),'--format', 'tsv'])
+            subprocess.run(['barcode_info', '--report', 'sample_inventory', '--bc', ','.join(admin_dict[admin][wo]), '--format', 'tsv'])
 
             with open('sample_inventory.tsv', 'r') as inv_file:
                 next(inv_file)
@@ -235,7 +219,7 @@ def update_sample_statuses(dil_drop, info, smartsheet_cl, sample_status):
     ss_headers = ['Work Order ID', 'Sample Full Name']
 
     # get dictionary of barcodes to workorders to admin projects
-    admin_wo_bc_dict = read_in_work_order('work_order.tsv',info)
+    admin_wo_bc_dict = read_in_work_order('work_order.tsv', info)
     # get dictionary of samples to work orders to admin projects
     samples_dict = get_sample_inventories(admin_wo_bc_dict)
 
@@ -393,7 +377,7 @@ def main():
     # Request input if not file flag
     else:
 
-        print('No file flag found! Would you like to add barcode through terminal(y/n)? ', end='')
+        print('No file flag found! \nWould you like to add barcode through terminal(y/n)? ', end='')
         ok = False
         while not ok:
             cin = input()
