@@ -233,12 +233,27 @@ class Ddo:
                     qpcr_parent = row.id
                     break
 
+        # get stuff for Aye
+        woid_list = []
+        admin_list = set()
+        for bc in barcode_dict:
+            woid_list = woid_list + barcode_dict[bc]['woids']
+            admin_list.update(barcode_dict[bc]['admin'])
+
+        woid_list_set = set(woid_list)
+
         # create row with dilution drop off title, capture row id for parent
         new_title_row = ss_connector.smart_sheet_client.models.Row({"format": ",,,,,,,,,18,,,,,,"})
         new_title_row.cells.append(
             {'column_id': col_dict['Reporting Instance'], 'value': ddo_title})
+        new_title_row.cells.append({'column_id': col_dict['Sequencing Work Order'], 'value': ','.join(woid_list_set)})
         new_title_row.cells.append({'column_id': col_dict['Items'], 'value': total_samples})
         new_title_row.cells.append({'column_id': col_dict['Failure'], 'value': failures})
+        new_title_row.cells.append({'column_id': col_dict['Admin Project'], 'value': ','.join(admin_list)})
+        new_title_row.cells.append({'column_id': col_dict['instrument/sequencing platform'],
+                                    'value': sequencing_platform})
+        new_title_row.cells.append({'column_id': col_dict['Event Date'], 'value': date})
+        new_title_row.cells.append({'column_id': col_dict['Production Notes'], 'value': status})
         new_title_row.to_top = True
         new_title_row.parent_id = qpcr_parent
 

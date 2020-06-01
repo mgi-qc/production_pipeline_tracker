@@ -230,7 +230,7 @@ def illumina_info_woid(woid, cutoff):
         ss_connector.Sheets.add_rows(4880402662877060, sibling_rows)
 
     print()
-    sample_status_data = update_mss_sheets_woid(illumina_data, woid_info_dict, woid)
+    sample_status_data, library_data = update_mss_sheets_woid(illumina_data, woid_info_dict, woid)
 
     total_samples = pcc_update(illumina_data,  woid_info_dict, sample_status_data)
 
@@ -261,13 +261,15 @@ def illumina_info_woid(woid, cutoff):
 
     s_scheduled = 0
     if 'Sequencing Scheduled' in sample_status_data:
-        s_scheduled = sample_status_data['qPCR drop-off']
+        s_scheduled = sample_status_data['Sequencing Scheduled']
     update_woid_row.cells.append(
         {'column_id': column_id_dict['Sequencing Scheduled'], 'value': s_scheduled})
 
     update_woid_row.cells.append({'column_id': column_id_dict['Total Samples'], 'value': total_samples})
 
     ss_connector.Sheets.update_rows(4880402662877060, [update_woid_row])
+
+    new_lib_status(parent_woid_row, library_data)
 
 
 def illumina_info_sample(samples, cutoff):
@@ -530,17 +532,20 @@ def update_mss_sheets_woid(i_data, woid_billing_dict, woid):
                             'Current Production Status',
                             'WOI Status',
                             'Sample Full Name',
-                            'Sequencing Completed Date']
+                            'Sequencing Completed Date',
+                            'Fail',
+                            'Re-attempt',
+                            'Aliquot Requested']
 
     woid_samples = [x.split('-lib')[0] for x in i_data.keys() if i_data[x]['Sequence Completed']]
 
     mss_data = {}
+    new_library = {}
     launch_samples = []
 
     for sheet_id in woid_mss_sheets[woid_billing_dict['Administration Project']]:
 
         updated_rows = []
-
         sheet_col_ids = {}
 
         # get required column id's to pull from sheet
@@ -573,7 +578,20 @@ def update_mss_sheets_woid(i_data, woid_billing_dict, woid):
                     sample_production_status = cell.value
                     status_found = True
 
-            if swoid_found and status_found and not sample_found:
+                if cell.column_id == sheet_col_ids['Fail']:
+                    fail = cell.value
+
+                if cell.column_id == sheet_col_ids['Re-attempt']:
+                    attempt = cell.value
+
+                if cell.column_id == sheet_col_ids['Aliquot Requested']:
+                    aliquot = cell.value
+
+            # if swoid_found and status_found and not sample_found:
+            if swoid_found and status_found:
+
+                new_library[sample_name] = {'Fail': fail, 'Re-attempt': attempt, 'Aliquot Requested': aliquot}
+
                 if sample_production_status not in mss_data:
                     mss_data[sample_production_status] = 1
                 else:
@@ -582,18 +600,18 @@ def update_mss_sheets_woid(i_data, woid_billing_dict, woid):
             if sample_found and swoid_found:
 
                 if sample_production_status == 'Sequencing Completed' or 'QC' in sample_production_status:
-                    if sample_production_status not in mss_data:
-                        mss_data[sample_production_status] = 1
-                    else:
-                        mss_data[sample_production_status] += 1
+                    # if sample_production_status not in mss_data:
+                    #     mss_data[sample_production_status] = 1
+                    # else:
+                    #     mss_data[sample_production_status] += 1
                     continue
 
                 if sample_production_status != 'Sequencing Completed' or 'QC' not in sample_production_status:
 
-                    if sequence_complete_status not in mss_data:
-                        mss_data[sequence_complete_status] = 1
-                    else:
-                        mss_data[sequence_complete_status] += 1
+                    # if sequence_complete_status not in mss_data:
+                    #     mss_data[sequence_complete_status] = 1
+                    # else:
+                    #     mss_data[sequence_complete_status] += 1
 
                     new_row = ss_connector.models.Row()
                     new_row.id = row.id
@@ -625,8 +643,9 @@ def update_mss_sheets_woid(i_data, woid_billing_dict, woid):
 
         update = ss_connector.Sheets.update_rows(mss_sheet.id, updated_rows)
         print('{} samples updated\n'.format(len(updated_rows)))
+
     update_launch_sheet(woid, launch_samples, ss_connector)
-    return mss_data
+    return mss_data, new_library
 
 
 def update_mss_sheets_sample(i_data, billing_wo_dict):
@@ -839,14 +858,6 @@ def pcc_update(data, admin_info, mss_data):
                                                        'name': facilitator_email}]}})
         new_swo_row.cells.append({'column_id': col_dict['Event Date'], 'value': datetime.datetime.now().isoformat()})
         new_swo_row.cells.append({'column_id': col_dict['Production Notes'], 'value': sequence_complete_status})
-        if 'New Library Needed' in mss_data:
-            new_swo_row.cells.append(
-                {'column_id': col_dict['New Library Needed'], 'value': mss_data['New Library Needed']})
-        if 'Abandoned' in mss_data:
-            new_swo_row.cells.append({'column_id': col_dict['Abandoned'], 'value': mss_data['Abandoned']})
-        if 'qPCR drop-off' in mss_data:
-            new_swo_row.cells.append({'column_id': col_dict['qPCR drop-off'], 'value': mss_data['qPCR drop-off']})
-        new_swo_row.cells.append({'column_id': col_dict['Total Samples'], 'value': total_samples})
 
         woid_row_response = ssclient.Sheets.add_rows(7495404104247172, [new_swo_row])
 
@@ -857,17 +868,44 @@ def pcc_update(data, admin_info, mss_data):
         new_swo_row.cells.append({'column_id': col_dict['Items'], 'value': total_seq_samples})
         new_swo_row.cells.append({'column_id': col_dict['Failure'], 'value': s_fail})
         new_swo_row.cells.append({'column_id': col_dict['Production Notes'], 'value': sequence_complete_status})
-        if 'New Library Needed' in mss_data:
-            new_swo_row.cells.append(
-                {'column_id': col_dict['New Library Needed'], 'value': mss_data['New Library Needed']})
-        if 'Abandoned' in mss_data:
-            new_swo_row.cells.append({'column_id': col_dict['Abandoned'], 'value': mss_data['Abandoned']})
-        if 'qPCR drop-off' in mss_data:
-            new_swo_row.cells.append({'column_id': col_dict['qPCR drop-off'], 'value': mss_data['qPCR drop-off']})
-        new_swo_row.cells.append({'column_id': col_dict['Total Samples'], 'value': total_samples})
+
         woid_row_response = ssclient.Sheets.update_rows(7495404104247172, [new_swo_row])
 
     return total_samples
+
+
+def new_lib_status(parent_row, lib_data):
+
+    ss_con, scr_sheet, col_dict = ss_connect()
+
+    woid_header_row_found = False
+    sample_found = False
+    lib_update_rows = []
+    for row in scr_sheet.rows:
+
+        if row.id == parent_row:
+            woid_header_row_found = True
+
+        if woid_header_row_found:
+
+            for cell in row.cells:
+                if cell.column_id == col_dict['Sample Name']:
+                    if cell.value in lib_data:
+                        sample = cell.value
+                        sample_found = True
+
+        if sample_found:
+
+            new_lib_row = ss_con.models.Row()
+            new_lib_row.id = row.id
+
+            for item_, value in lib_data[sample].items():
+                if value is not None:
+                    new_lib_row.cells.append({'column_id': col_dict[item_], 'value': value})
+
+            lib_update_rows.append(new_lib_row)
+
+    ss_con.Sheets.update_rows(4880402662877060, lib_update_rows)
 
 
 print('Starting Sequencing Complete:\n')
