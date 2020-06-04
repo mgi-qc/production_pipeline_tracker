@@ -230,9 +230,9 @@ def illumina_info_woid(woid, cutoff):
         ss_connector.Sheets.add_rows(4880402662877060, sibling_rows)
 
     print()
-    sample_status_data, library_data = update_mss_sheets_woid(illumina_data, woid_info_dict, woid)
+    sample_status_data, library_data, total_samples = update_mss_sheets_woid(illumina_data, woid_info_dict, woid)
 
-    total_samples = pcc_update(illumina_data,  woid_info_dict, sample_status_data)
+    pcc_update(illumina_data,  woid_info_dict, sample_status_data)
 
     update_woid_row = ss_connector.models.Row()
     update_woid_row.id = parent_woid_row
@@ -466,6 +466,8 @@ def update_sibling_row(sib_row_id, sample_dict, sc, column_ids_dict, status):
     new_row.cells.append(
         {'column_id': column_ids_dict['Data Count'], 'value': sample_dict['IndexIllumina Count']})
 
+    new_row.cells.append({'column_id': column_ids_dict['Date Completed'], 'value': sample_dict['Date Completed']})
+
     new_row.cells.append(
         {'column_id': column_ids_dict['Event Date'], 'objectValue': datetime.datetime.now().isoformat()})
 
@@ -540,6 +542,7 @@ def update_mss_sheets_woid(i_data, woid_billing_dict, woid):
     woid_samples = [x.split('-lib')[0] for x in i_data.keys() if i_data[x]['Sequence Completed']]
 
     mss_data = {}
+    total_samples = 0
     new_library = {}
     launch_samples = []
 
@@ -590,6 +593,7 @@ def update_mss_sheets_woid(i_data, woid_billing_dict, woid):
             # if swoid_found and status_found and not sample_found:
             if swoid_found and status_found:
 
+                total_samples += 1
                 new_library[sample_name] = {'Fail': fail, 'Re-attempt': attempt, 'Aliquot Requested': aliquot}
 
                 if sample_production_status not in mss_data:
@@ -600,18 +604,11 @@ def update_mss_sheets_woid(i_data, woid_billing_dict, woid):
             if sample_found and swoid_found:
 
                 if sample_production_status == 'Sequencing Completed' or 'QC' in sample_production_status:
-                    # if sample_production_status not in mss_data:
-                    #     mss_data[sample_production_status] = 1
-                    # else:
-                    #     mss_data[sample_production_status] += 1
                     continue
 
                 if sample_production_status != 'Sequencing Completed' or 'QC' not in sample_production_status:
 
-                    # if sequence_complete_status not in mss_data:
-                    #     mss_data[sequence_complete_status] = 1
-                    # else:
-                    #     mss_data[sequence_complete_status] += 1
+                    mss_data[sample_production_status] -= 1
 
                     new_row = ss_connector.models.Row()
                     new_row.id = row.id
@@ -645,7 +642,7 @@ def update_mss_sheets_woid(i_data, woid_billing_dict, woid):
         print('{} samples updated\n'.format(len(updated_rows)))
 
     update_launch_sheet(woid, launch_samples, ss_connector)
-    return mss_data, new_library
+    return mss_data, new_library, total_samples
 
 
 def update_mss_sheets_sample(i_data, billing_wo_dict):
@@ -796,11 +793,9 @@ def update_launch_sheet(woid, samples, ss_c):
 def pcc_update(data, admin_info, mss_data):
 
     woid = admin_info['Work Order']
-
     total_seq_samples = 0
-    total_samples = 0
+
     for s in mss_data:
-        total_samples += int(mss_data[s])
         if s in ['QC Pass', 'QC Fail', 'Sequencing Completed']:
             total_seq_samples += int(mss_data[s])
 
@@ -871,7 +866,7 @@ def pcc_update(data, admin_info, mss_data):
 
         woid_row_response = ssclient.Sheets.update_rows(7495404104247172, [new_swo_row])
 
-    return total_samples
+    return
 
 
 def new_lib_status(parent_row, lib_data):
