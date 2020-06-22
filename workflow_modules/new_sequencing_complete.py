@@ -269,7 +269,7 @@ def illumina_info_woid(woid, cutoff):
 
     ss_connector.Sheets.update_rows(4880402662877060, [update_woid_row])
 
-    new_lib_status(parent_woid_row, library_data)
+    new_lib_status(parent_woid_row, library_data, woid)
 
 
 def illumina_info_sample(samples, cutoff):
@@ -610,6 +610,11 @@ def update_mss_sheets_woid(i_data, woid_billing_dict, woid):
 
                     mss_data[sample_production_status] -= 1
 
+                    if 'Sequencing Completed' not in mss_data:
+                        mss_data['Sequencing Completed'] = 1
+                    else:
+                        mss_data['Sequencing Completed'] += 1
+
                     new_row = ss_connector.models.Row()
                     new_row.id = row.id
 
@@ -641,7 +646,6 @@ def update_mss_sheets_woid(i_data, woid_billing_dict, woid):
         update = ss_connector.Sheets.update_rows(mss_sheet.id, updated_rows)
         print('{} samples updated\n'.format(len(updated_rows)))
 
-    update_launch_sheet(woid, launch_samples, ss_connector)
     return mss_data, new_library, total_samples
 
 
@@ -758,38 +762,6 @@ def update_mss_sheets_sample(i_data, billing_wo_dict):
             print('{} samples updated\n'.format(len(updated_rows)))
 
 
-def update_launch_sheet(woid, samples, ss_c):
-
-    add_rows = []
-
-    col_dict = get_column_ids(1841522174912388, ss_c)
-
-    new_launch_row = ss_c.models.Row()
-    new_launch_row.to_bottom = True
-    new_launch_row.cells.append({'column_id': col_dict['Work_Order/Samples'], 'value': woid})
-    new_launch_row.cells.append({'column_id': col_dict['Date'], 'value': datetime.datetime.now().isoformat()})
-    add_rows.append(new_launch_row)
-
-    new_launch_row = ss_c.models.Row()
-    new_launch_row.to_bottom = True
-    new_launch_row.cells.append({'column_id': col_dict['Work_Order/Samples'], 'value': 'Library'})
-    add_rows.append(new_launch_row)
-
-    for s in samples:
-        new_launch_row = ss_c.models.Row()
-        new_launch_row.to_bottom = True
-        new_launch_row.cells.append({'column_id': col_dict['Work_Order/Samples'], 'value': s})
-        add_rows.append(new_launch_row)
-
-    if len(add_rows) == 2:
-        new_launch_row = ss_c.models.Row()
-        new_launch_row.to_bottom = True
-        new_launch_row.cells.append({'column_id': col_dict['Work_Order/Samples'], 'value': 'NA'})
-        add_rows.append(new_launch_row)
-
-    ss_c.Sheets.add_rows(1841522174912388, add_rows)
-
-
 def pcc_update(data, admin_info, mss_data):
 
     woid = admin_info['Work Order']
@@ -869,27 +841,35 @@ def pcc_update(data, admin_info, mss_data):
     return
 
 
-def new_lib_status(parent_row, lib_data):
+def new_lib_status(parent_row, lib_data, woid):
 
     ss_con, scr_sheet, col_dict = ss_connect()
 
     woid_header_row_found = False
     sample_found = False
+    work_order_found = False
     lib_update_rows = []
+
     for row in scr_sheet.rows:
 
         if row.id == parent_row:
             woid_header_row_found = True
+            continue
 
         if woid_header_row_found:
 
             for cell in row.cells:
+
+                if cell.column_id == col_dict['Work Order ID']:
+                    if cell.value == woid:
+                        work_order_found = True
+
                 if cell.column_id == col_dict['Sample Name']:
                     if cell.value in lib_data:
                         sample = cell.value
                         sample_found = True
 
-        if sample_found:
+        if sample_found and work_order_found:
 
             new_lib_row = ss_con.models.Row()
             new_lib_row.id = row.id
