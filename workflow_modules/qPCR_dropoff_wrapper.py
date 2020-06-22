@@ -87,7 +87,7 @@ def load_dropoff_into_smartsheet(dropoff_sheet, wo_sheet, info, smartsheet_obj, 
                 facil_list.append({"email": update_admin_email(smartsheet_obj, person), "name": person})
 
     # Build new cells for
-    new_row = smartsheet.smartsheet.models.Row()
+    new_row = smartsheet.smartsheet.models.Row({"format": ",,,,,,,,,18,,,,,,"})
     new_row.parent_id = header_row.id
     new_row.to_top = True
     new_row.cells.append({'column_id': column_ids['Reporting Instance'], 'value': info['Title']})

@@ -927,7 +927,7 @@ def update_PCC(sample_list, ss_client):
                     if cell.value == 'LC dilution drop-off':
                         lcddo_row = row
 
-        new_row = smartsheet.smartsheet.models.Row()
+        new_row = smartsheet.smartsheet.models.Row({"format": ",,,,,,,,,18,,,,,,"})
         new_row.parent_id = lcddo_row.id
         new_row.cells.append({'column_id': col_ids['Reporting Instance'], 'value': row_dict['do_name']})
         new_row.cells.append({'column_id': col_ids['Sequencing Work Order'], 'value': ','.join(row_dict['wo'])})
