@@ -117,7 +117,7 @@ def get_total_dna_needed():
     return min_req, std_req
 
 
-def check_dna(total_dna, min_dna_req):
+def check_dna(total_dna, min_dna_req, min_max):
     """
 
     :param total_dna: total dna assessed
@@ -127,6 +127,7 @@ def check_dna(total_dna, min_dna_req):
 
     if is_num(total_dna):
         if float(total_dna) > float(min_dna_req):
+            min_max.append(total_dna)
             return 'Resource Assessment Pass'
         else:
             return 'Resource Assessment Fail'
@@ -143,8 +144,10 @@ def update_counts(total_dna, counts, std_dna_req, min_dna_req):
     :param min_dna_req: user input
     :return:
     """
+    result = False
     if is_num(total_dna):
         total_dna = float(total_dna)
+        result = True
         if total_dna > std_dna_req:
             counts['std_pass'] += 1
         else:
@@ -155,9 +158,10 @@ def update_counts(total_dna, counts, std_dna_req, min_dna_req):
                     counts['fail_min'] += 1
                 else:
                     counts['fails'] += 1
+    return result
 
 
-def build_assessment_report(counts, std_req, min_req, total, proj_info):
+def build_assessment_report(counts, std_req, min_req, total, proj_info, max_min):
     """
     Function edited/revised by Lee Trani, changes tracked in github.
     Make assessment report to be attached to smartsheet
@@ -182,12 +186,13 @@ def build_assessment_report(counts, std_req, min_req, total, proj_info):
              '\t- # Samples Failed, Not Meeting Seq Plan Min. Amts(50-{olmin} ng): {min_fail}\n' \
              '\t- # Samples Failed (less than 50ng): {fails}\n' \
              '\n' \
-             '\t- Comments:'.format(
+             '\t- Comments:\n' \
+             '\t  Total DNA ranges from ~{min}ng to ~{max}ng\n'.format(
                                     total=total, pipeline=proj_info['pipeline'],
                                     std_req=std_req, std_pass=counts['std_pass'],
                                     min_req=min_req, min_pass=counts['min_pass'],
                                     olmin=min_req - 1, min_fail=counts['fail_min'],
-                                    fails=counts['fails'])
+                                    fails=counts['fails'], min=min(max_min), max=max(max_min))
 
     out_file = '{desc}.txt'.format(desc=proj_info['description'].replace(' ', '_').replace('/', '-')).replace('(', '') \
         .replace(')', '')
@@ -196,7 +201,7 @@ def build_assessment_report(counts, std_req, min_req, total, proj_info):
     comment = input('\nAdd comment to report/resource bank work order in PCC (Enter to continue without comment)?:\n')
 
     with open(out_file, 'w') as fout:
-        fout.write('{}\n\t  {}\n'.format(report, comment))
+        fout.write('{}\t  {}\n'.format(report, comment))
 
     return [out_file, comment]
 
@@ -223,6 +228,7 @@ def lims_data(woid, inventory_file, min_dna_req, std_dna_req, ss_con):
         data = {}
 
         header_found = False
+        max_min_list = []
 
         for line in infile_reader:
 
@@ -256,16 +262,19 @@ def lims_data(woid, inventory_file, min_dna_req, std_dna_req, ss_con):
             if header_found:
                 line_dict = dict(zip(header, line))
                 line_dict['resource_assessment'] = check_dna(total_dna=line_dict['Total_DNA (ng)'],
-                                                             min_dna_req=min_dna_req)
+                                                             min_dna_req=min_dna_req, min_max=max_min_list)
                 data[line_dict['Content_Desc']] = line_dict
-                update_counts(total_dna=line_dict['Total_DNA (ng)'], counts=counts, std_dna_req=std_dna_req,
-                              min_dna_req=min_dna_req)
+                result = update_counts(total_dna=line_dict['Total_DNA (ng)'], counts=counts, std_dna_req=std_dna_req,
+                                       min_dna_req=min_dna_req)
+                if not result:
+                    print('Sample {} has no Total_DNA (ng)'.format(line_dict['Content_Desc']))
                 outfile_writer.writerow(line_dict)
 
     project_dictionary['Items'] = len(data)
     project_dictionary['Failure'] = counts['fail_min'] + counts['fails']
 
-    report_comment_list = build_assessment_report(counts, std_dna_req, min_dna_req, len(data), project_dictionary)
+    report_comment_list = build_assessment_report(counts, std_dna_req, min_dna_req, len(data), project_dictionary,
+                                                  max_min_list)
     report_comment_list.append('{}.inventory.csv'.format(woid))
 
     return project_dictionary, data, report_comment_list
@@ -298,7 +307,7 @@ def get_mss_sheets(admin, ss_client):
 
     # get project samples folder
     for folder in active_folder.folders:
-        if folder.name == admin:
+        if folder.name == admin[:50]:
             samp_folder = ss_client.get_object(folder.id, 'f')
 
     sheets = []
@@ -455,8 +464,6 @@ def add_report_to_pcc(pcc_sheet, proj_info, ss_connector, rc):
 def main():
     """
     main functions edited/updated/revised by Lee Trani, changes tracked in github.
-    TODO: Add report to smartsheet resource work order row in PCC
-    TODO: Mark failed samples in smartsheet to kick off workflow
     """
 
     # Set dev option
@@ -466,9 +473,6 @@ def main():
 
     # Initialize smrtqc object
     ss_client = smrtqc.SmartQC(api_key=os.environ.get('SMRT_API'))
-
-    # Change directories to smartflow
-    os.chdir(ss_client.get_working_directory('rb'))
 
     # get RB work order, Pass/Fail conditions, user comment from input
     woid = get_wo_id()
@@ -496,11 +500,12 @@ def main():
     # Add report to work order row in Production Communication Center
     add_report_to_pcc(pcc_sheet, proj_info, ss_client, report_comment)
 
-    # remove inventory file
-    os.remove('inventory.tsv')
-
     print('\nReport file:\n{}\n\nInventory file:\n{}\n\nRessource Assessment Complete.'.format(report_comment[0],
-                                                                                             report_comment[2]))
+                                                                                               report_comment[2]))
+    # remove files
+    os.remove('inventory.tsv')
+    os.remove(report_comment[0])
+    os.remove(report_comment[2])
 
 
 if __name__ == '__main__':
