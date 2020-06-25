@@ -14,7 +14,6 @@ import argparse
 def is_num(s):
     """
     Returns True if object can be cast as an int, False if not
-
     :param s: any object 's'
     :return: bool
     """
@@ -117,17 +116,18 @@ def get_total_dna_needed():
     return min_req, std_req
 
 
-def check_dna(total_dna, min_dna_req, min_max):
+def check_dna(total_dna, min_dna_req, mm):
     """
-
+    Assess samples as pass/fail
     :param total_dna: total dna assessed
     :param min_dna_req: dna required for pass
+    :param mm: list to keep track of pass values
     :return: Pass or fail output
     """
 
     if is_num(total_dna):
+        mm.append(float(total_dna))
         if float(total_dna) > float(min_dna_req):
-            min_max.append(total_dna)
             return 'Resource Assessment Pass'
         else:
             return 'Resource Assessment Fail'
@@ -137,7 +137,7 @@ def check_dna(total_dna, min_dna_req, min_max):
 
 def update_counts(total_dna, counts, std_dna_req, min_dna_req):
     """
-
+    Update pass fail counts
     :param total_dna: dna value from inventory query
     :param counts: count dict for result tracking
     :param std_dna_req: user input
@@ -161,7 +161,7 @@ def update_counts(total_dna, counts, std_dna_req, min_dna_req):
     return result
 
 
-def build_assessment_report(counts, std_req, min_req, total, proj_info, max_min):
+def build_assessment_report(counts, std_req, min_req, total, proj_info, min_max):
     """
     Function edited/revised by Lee Trani, changes tracked in github.
     Make assessment report to be attached to smartsheet
@@ -170,7 +170,7 @@ def build_assessment_report(counts, std_req, min_req, total, proj_info, max_min)
     :param std_req: std req dna amount for sample to pass
     :param min_req: min req dna amount for sample to pass
     :param proj_info: dictionary of project information
-    :param comment: user comment
+    :param min_max: list of total_dna values that pass for max/min comment
     :return: assessment file name
     """
 
@@ -192,7 +192,7 @@ def build_assessment_report(counts, std_req, min_req, total, proj_info, max_min)
                                     std_req=std_req, std_pass=counts['std_pass'],
                                     min_req=min_req, min_pass=counts['min_pass'],
                                     olmin=min_req - 1, min_fail=counts['fail_min'],
-                                    fails=counts['fails'], min=min(max_min), max=max(max_min))
+                                    fails=counts['fails'], min=min(min_max), max=max(min_max))
 
     out_file = '{desc}.txt'.format(desc=proj_info['description'].replace(' ', '_').replace('/', '-')).replace('(', '') \
         .replace(')', '')
@@ -202,6 +202,8 @@ def build_assessment_report(counts, std_req, min_req, total, proj_info, max_min)
 
     with open(out_file, 'w') as fout:
         fout.write('{}\t  {}\n'.format(report, comment))
+
+    comment = 'Total DNA ranges from ~{min}ng to ~{max}ng\n{c}'.format(min=min(min_max), max=max(min_max), c=comment)
 
     return [out_file, comment]
 
@@ -228,7 +230,7 @@ def lims_data(woid, inventory_file, min_dna_req, std_dna_req, ss_con):
         data = {}
 
         header_found = False
-        max_min_list = []
+        min_max_list = []
 
         for line in infile_reader:
 
@@ -262,19 +264,21 @@ def lims_data(woid, inventory_file, min_dna_req, std_dna_req, ss_con):
             if header_found:
                 line_dict = dict(zip(header, line))
                 line_dict['resource_assessment'] = check_dna(total_dna=line_dict['Total_DNA (ng)'],
-                                                             min_dna_req=min_dna_req, min_max=max_min_list)
+                                                             min_dna_req=min_dna_req, mm=min_max_list)
                 data[line_dict['Content_Desc']] = line_dict
                 result = update_counts(total_dna=line_dict['Total_DNA (ng)'], counts=counts, std_dna_req=std_dna_req,
                                        min_dna_req=min_dna_req)
+
                 if not result:
                     print('Sample {} has no Total_DNA (ng)'.format(line_dict['Content_Desc']))
+
                 outfile_writer.writerow(line_dict)
 
     project_dictionary['Items'] = len(data)
     project_dictionary['Failure'] = counts['fail_min'] + counts['fails']
 
     report_comment_list = build_assessment_report(counts, std_dna_req, min_dna_req, len(data), project_dictionary,
-                                                  max_min_list)
+                                                  min_max_list)
     report_comment_list.append('{}.inventory.csv'.format(woid))
 
     return project_dictionary, data, report_comment_list
@@ -282,6 +286,7 @@ def lims_data(woid, inventory_file, min_dna_req, std_dna_req, ss_con):
 
 def get_mss_sheets(admin, ss_client):
     """
+    Get MSS sheets and PCC sheet for updates
     :param admin: Admin project to get MSS sheets from
     :param ss_client: smartsheet object
     :return: list of MSS sheets
