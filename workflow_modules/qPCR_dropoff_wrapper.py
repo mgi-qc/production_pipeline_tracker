@@ -76,7 +76,6 @@ def load_dropoff_into_smartsheet(dropoff_sheet, wo_sheet, info, smartsheet_obj, 
                     header_row = row
                     prod_note = 'capture drop-off'
 
-
     # get list of facilitators involved in this dropoff
     facil_list = []
     facilitators = []
@@ -205,6 +204,7 @@ def get_sample_inventories(admin_dict):
                 next(inv_reader)
                 for line in inv_reader:
                     if line['DNA_Type'] != 'Pooled Library' and line['DNA_Type'] != 'pooled library':
+                        admin = admin[:50]
                         if admin not in sample_inventories:
                             sample_inventories[admin] = {}
                         if wo not in sample_inventories[admin]:
@@ -237,6 +237,7 @@ def update_sample_statuses(dil_drop, info, smartsheet_cl, sample_status):
 
     for folder in smartsheet_cl.get_folder_list(projects_folder.id, 'f'):
         if folder.name in samples_dict:
+
             for sheet in smartsheet_cl.get_object(folder.id, 'f').sheets:
                 rows_to_update = []
 
@@ -271,7 +272,6 @@ def update_sample_statuses(dil_drop, info, smartsheet_cl, sample_status):
                             date_cell.value = info['Date']
                             status_cell.column_id = col_ids['Current Production Status']
                             status_cell.value = sample_status
-
 
                             rows_to_update.append(smartsheet.smartsheet.models.Row())
                             rows_to_update[-1].id = row.id

@@ -28,6 +28,7 @@ parser.add_argument('-add', help='Add or append samples to MSS', action='store_t
 parser.add_argument('-update', help='Update sample status', action='store_true')
 parser.add_argument('-si', help='Initial Sequencing complete update', action='store_true')
 parser.add_argument('-s', help='Sequencing complete update', action='store_true')
+parser.add_argument('-ls', help='Sequencing complete update', action='store_true')
 parser.add_argument('-tkb', help='Sequencing complete total kb cut off', type=int)
 parser.add_argument('-qpcr', help='qPCR dropoff', action='store_true')
 parser.add_argument('-capture', help='Capture dropoff', action='store_true')
@@ -423,6 +424,10 @@ def main():
     if args.s:
         subprocess.run(['python3',
                         '/gscmnt/gc2746/production/smartflow/bin/workflow_modules/new_sequencing_complete.py'])
+
+    if args.ls:
+        subprocess.run(['python3',
+                        '/gscmnt/gc2746/production/smartflow/bin/workflow_modules/new_sequencing_complete.py', 'ls'])
 
     if args.ss:
 
