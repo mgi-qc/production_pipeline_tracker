@@ -230,6 +230,7 @@ def lims_data(woid, inventory_file, min_dna_req, std_dna_req, ss_con):
         data = {}
 
         header_found = False
+        inventory_history = False
         min_max_list = []
 
         for line in infile_reader:
@@ -261,7 +262,10 @@ def lims_data(woid, inventory_file, min_dna_req, std_dna_req, ss_con):
                 header_found = True
                 continue
 
-            if header_found:
+            if 'Inventory History' in line:
+                inventory_history = True
+
+            if header_found and not inventory_history:
                 line_dict = dict(zip(header, line))
                 line_dict['resource_assessment'] = check_dna(total_dna=line_dict['Total_DNA (ng)'],
                                                              min_dna_req=min_dna_req, mm=min_max_list)

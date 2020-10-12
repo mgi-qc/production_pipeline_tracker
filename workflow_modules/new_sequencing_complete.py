@@ -18,10 +18,10 @@ def ss_connect(conn=None):
     if conn:
         return ss_c
     # Get Sequence Complete Sheet Column ID's
-    id_dict = get_column_ids(4880402662877060, ss_c)
+    id_dict = get_column_ids(sequence_review_sheet, ss_c)
 
     # Get Sequence Complete Sheet
-    sheet = ss_c.Sheets.get_sheet(sheet_id=4880402662877060)
+    sheet = ss_c.Sheets.get_sheet(sheet_id=sequence_review_sheet)
 
     return ss_c, sheet, id_dict
 
@@ -207,11 +207,11 @@ def illumina_info_woid(woid, cutoff):
 
         if len(updated_rows) > 0:
             print('Updated {} existing samples.'.format(len(updated_rows)))
-            ss_connector.Sheets.update_rows(4880402662877060, updated_rows)
+            ss_connector.Sheets.update_rows(sequence_review_sheet, updated_rows)
 
         if len(new_rows) > 0:
             print('Added {} new samples'.format(len(new_rows)))
-            ss_connector.Sheets.add_rows(4880402662877060, new_rows)
+            ss_connector.Sheets.add_rows(sequence_review_sheet, new_rows)
 
     if not woid_exists:
 
@@ -227,7 +227,7 @@ def illumina_info_woid(woid, cutoff):
                                    column_id_dict))
 
         print('Adding {} Samples.'.format(len(sibling_rows)))
-        ss_connector.Sheets.add_rows(4880402662877060, sibling_rows)
+        ss_connector.Sheets.add_rows(sequence_review_sheet, sibling_rows)
 
     print()
     sample_status_data, library_data, total_samples = update_mss_sheets_woid(illumina_data, woid_info_dict, woid)
@@ -267,9 +267,9 @@ def illumina_info_woid(woid, cutoff):
 
     update_woid_row.cells.append({'column_id': column_id_dict['Total Samples'], 'value': total_samples})
 
-    ss_connector.Sheets.update_rows(4880402662877060, [update_woid_row])
+    ss_connector.Sheets.update_rows(sequence_review_sheet, [update_woid_row])
 
-    new_lib_status(parent_woid_row, library_data, woid)
+    # new_lib_status(parent_woid_row, library_data, woid)
 
 
 def illumina_info_sample(samples, cutoff):
@@ -320,7 +320,7 @@ def illumina_info_sample(samples, cutoff):
                                                   wo_info_dict[ill_data[sample]['WorkOrder']], ss_con, ids_dict))
 
     print('Appending {} samples to Ilummina Sample Query row'.format(len(new_sample_rows)))
-    ss_con.Sheets.add_rows(4880402662877060, new_sample_rows)
+    ss_con.Sheets.add_rows(sequence_review_sheet, new_sample_rows)
     update_mss_sheets_sample(ill_data, wo_info_dict)
 
 
@@ -365,7 +365,7 @@ def create_parent_row(billing, sc, column_ids_dict, woid, pr):
     new_woid_row.to_top = True
     new_woid_row.parent_id = pr
 
-    woid_row_response = ss_connector.Sheets.add_rows(4880402662877060, [new_woid_row])
+    woid_row_response = ss_connector.Sheets.add_rows(sequence_review_sheet, [new_woid_row])
 
     for r in woid_row_response.data:
         return r.id
@@ -880,8 +880,13 @@ def new_lib_status(parent_row, lib_data, woid):
 
             lib_update_rows.append(new_lib_row)
 
-    ss_con.Sheets.update_rows(4880402662877060, lib_update_rows)
+    ss_con.Sheets.update_rows(sequence_review_sheet, lib_update_rows)
 
+
+sequence_review_sheet = 4880402662877060
+if len(sys.argv) == 2 and sys.argv[1] == 'ls':
+    print('\nUpdating Large Scale Projects Tracking Sheet\n')
+    sequence_review_sheet = 8140804578404228
 
 print('Starting Sequencing Complete:\n')
 total_kb_cutoff = input('Enter tkb (return for 63000000 default):\n')
