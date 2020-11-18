@@ -470,6 +470,10 @@ def add_report_to_pcc(pcc_sheet, proj_info, ss_connector, rc):
                                                                                               'application/EXCEL'))
 
 
+def update_confluence():
+    return
+
+
 def main():
     """
     main functions edited/updated/revised by Lee Trani, changes tracked in github.
