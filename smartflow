@@ -16,6 +16,7 @@ import workflow_modules.status_update as status_update
 import workflow_modules.woInfo as woInfo
 import workflow_modules.dilution_drop_off as ddo
 import workflow_modules.sequence_complete as sequence_complete
+import workflow_modules.confluence as confluence
 
 
 parser = argparse.ArgumentParser()
@@ -29,11 +30,13 @@ parser.add_argument('-update', help='Update sample status', action='store_true')
 parser.add_argument('-si', help='Initial Sequencing complete update', action='store_true')
 parser.add_argument('-s', help='Sequencing complete update', action='store_true')
 parser.add_argument('-ls', help='Sequencing complete update', action='store_true')
+parser.add_argument('-of', help='Sequencing complete update', action='store_true')
 parser.add_argument('-tkb', help='Sequencing complete total kb cut off', type=int)
 parser.add_argument('-qpcr', help='qPCR dropoff', action='store_true')
 parser.add_argument('-capture', help='Capture dropoff', action='store_true')
 parser.add_argument('-rba', help='Resource bank assessment', action='store_true')
 parser.add_argument('-pb', help='Library Core Plate Builder', action='store_true')
+parser.add_argument('-c', help='Add work order info to confluence', action='store_true')
 parser.add_argument('-dev', help='Point scripts toward development workspace and directories', action='store_true')
 args = parser.parse_args()
 
@@ -289,6 +292,11 @@ def main():
                 if os.path.isfile('{}.sample.tsv'.format(woid)):
                     os.remove('{}.sample.tsv'.format(woid))
 
+                # Add work order info to Confluence
+                print('\nAdding {} to Confluence.'.format(woid))
+                confluence_add = confluence.Confluence(woid=woid)
+                confluence_add.add_confluence_row(admin_info, len(sample_data))
+
                 print('\nSmartsheet resource work order tracking updates complete.')
 
             if args.update:
@@ -352,6 +360,11 @@ def main():
 
                 if os.path.isfile('{}.sample.tsv'.format(woid)):
                     os.remove('{}.sample.tsv'.format(woid))
+
+                # Add work order info to Confluence
+                print('\nAdding {} to Confluence.'.format(woid))
+                confluence_add = confluence.Confluence(woid=woid)
+                confluence_add.add_confluence_row(admin_info, len(sample_data))
 
                 print('\nSmartsheet resource work order tracking updates complete.')
 
@@ -428,6 +441,10 @@ def main():
     if args.ls:
         subprocess.run(['python3',
                         '/gscmnt/gc2746/production/smartflow/bin/workflow_modules/new_sequencing_complete.py', 'ls'])
+
+    if args.of:
+        subprocess.run(['python3',
+                        '/gscmnt/gc2746/production/smartflow/bin/workflow_modules/new_sequencing_complete.py', 'of'])
 
     if args.ss:
 
@@ -547,6 +564,18 @@ def main():
         print('\nSamples found to update: {}'.format(len(ddo_samples)))
         print('Samples updated: {}'.format(updated_samples))
         print('\nDilution Drop Off Complete\n')
+
+    if args.w and args.c:
+
+        if len(woids) != 1:
+            sys.exit('Please enter single work order ID.')
+        # Add work order info to Confluence
+        print('Adding {} to Confluence.'.format(woids[0]))
+        confluence_add = confluence.Confluence(woid=woids[0])
+        admin_info = confluence_add.get_admin()
+        confluence_add.add_confluence_row(admin_info)
+        os.remove('{}.sample.tsv'.format(woids[0]))
+        os.remove('sample.tsv')
 
     # If one of Thomas's updates:
     if args.rba or args.pb or args.capture or args.qpcr:

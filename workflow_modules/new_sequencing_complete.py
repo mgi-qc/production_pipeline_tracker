@@ -888,6 +888,10 @@ if len(sys.argv) == 2 and sys.argv[1] == 'ls':
     print('\nUpdating Large Scale Projects Tracking Sheet\n')
     sequence_review_sheet = 8140804578404228
 
+if len(sys.argv) == 2 and sys.argv[1] == 'of':
+    print('\nUpdating Large Scale Projects Tracking Sheet: Overflow\n')
+    sequence_review_sheet = 2023194224813956
+
 print('Starting Sequencing Complete:\n')
 total_kb_cutoff = input('Enter tkb (return for 63000000 default):\n')
 if not total_kb_cutoff:
