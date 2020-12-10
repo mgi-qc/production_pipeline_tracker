@@ -165,8 +165,8 @@ class sampleUpdate:
                 new_row.cells.append({'column_id': sheet_columns['RWOID Description'], 'value': self.description})
                 continue
 
-            if header == 'SWOID Description' and self.swo:
-                new_row.cells.append({'column_id': sheet_columns['SWOID Description'], 'value': self.description})
+            if header == 'WOID Description' and self.swo:
+                new_row.cells.append({'column_id': sheet_columns['WOID Description'], 'value': self.description})
                 continue
 
             # TODO handle two case controls if present
