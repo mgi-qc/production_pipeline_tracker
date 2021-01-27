@@ -27,9 +27,11 @@ def ss_connect(conn=None):
 
 
 def get_email_column_ids(sheet_column_object):
+
     column_id_dict = {}
     for col in sheet_column_object:
         column_id_dict[col.title] = col.id
+
     return column_id_dict
 
 
@@ -90,6 +92,9 @@ def illumina_info_data(illumina_file, cutoff, billing=None):
                 wo_commands.add('wo_info --report billing --woid {} --format tsv --output-file-name {}'
                                 .format(l['WorkOrder'], '.'.join([l['WorkOrder'], 'wo_info.billing'])))
 
+            # add zero if no value found
+            [l.update({x: '0'}) for x, y in l.items() if not y and x not in ['Seq Complete Status',
+                                                                             'Sequence Completed']]
             data[sample] = l
 
     os.remove(illumina_file)
