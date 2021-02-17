@@ -59,6 +59,7 @@ class Confluence:
 
         self.woid = woid
         self.w = woinfo.woInfo(self.woid)
+        self.sample_data = self.w.get_samples()
 
     def get_admin(self):
 
@@ -70,7 +71,15 @@ class Confluence:
         return admin_info
 
     def get_sample_number(self):
-        return len(self.w.get_samples())
+        return len(self.sample_data)
+
+    def get_gtac_snum(self):
+
+        for sample in self.sample_data:
+            if self.sample_data[sample]['Sample Nomenclature'] == 'GTAC':
+                return self.sample_data[sample]['Name']
+
+        return None
 
     def get_assay(self):
 
@@ -130,6 +139,10 @@ class Confluence:
         new_reagent_row.cells.append({'column_id': reagent_col_ids['Assay'], 'value': self.get_assay()})
         new_reagent_row.cells.append({'column_id': reagent_col_ids['Active Items'], 'value': sample_number})
 
+        gtac_s_num = self.get_gtac_snum()
+        if gtac_s_num is not None:
+            new_row.cells.append({'column_id': col_ids['s####'], 'value': gtac_s_num})
+
         for header, value in woinfo_dict.items():
 
             if header in headers:
@@ -146,7 +159,7 @@ class Confluence:
                     new_reagent_row.cells.append({'column_id': reagent_col_ids[header], 'value': value,
                                                   'hyperlink':
                                                       {'url':
-                                                           'https://imp-lims.ris.wustl.edu/entity/setup-work-order/{}'
+                                                       'https://imp-lims.ris.wustl.edu/entity/setup-work-order/{}'
                                                  .format(value)}})
                     continue
 
