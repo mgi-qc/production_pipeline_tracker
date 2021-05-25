@@ -225,7 +225,7 @@ class sampleUpdate:
         if len(self.sheet_obj) == 3:
             admin_folder_id = self.sheet_obj[2]
 
-        ss_available_rows_to_write = 15000 - sheet.total_row_count
+        ss_available_rows_to_write = 10000 - sheet.total_row_count
 
         # all samples fit on one sheet (3 keys in data are not samples)
         if len(self.sheet_data) < ss_available_rows_to_write:
@@ -279,7 +279,7 @@ class sampleUpdate:
                 new_sheet_object = self.ss_connector.get_object(new_sheet_id, 's')
                 new_sheet_columns_dict = self.get_column_ids(new_sheet_object.columns)
 
-                if len(rows_to_write_to_new_sheet_dict) <= 15000:
+                if len(rows_to_write_to_new_sheet_dict) <= 10000:
                     make_sheet = False
                     sample_counter = sample_counter - len(rows_to_write_to_new_sheet_dict)
                     rows_to_complete_sheet = []
@@ -293,8 +293,8 @@ class sampleUpdate:
 
                 else:
 
-                    rows_to_write = self.dict_slice(rows_to_write_to_new_sheet_dict, high=15000)
-                    rows_left = self.dict_slice(rows_to_write_to_new_sheet_dict, low=15000,
+                    rows_to_write = self.dict_slice(rows_to_write_to_new_sheet_dict, high=10000)
+                    rows_left = self.dict_slice(rows_to_write_to_new_sheet_dict, low=10000,
                                                 high=len(rows_to_write_to_new_sheet_dict))
 
                     rows_to_complete_sheet = []
