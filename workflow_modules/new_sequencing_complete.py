@@ -71,11 +71,13 @@ def illumina_info_data(illumina_file, cutoff, billing=None):
 
     with open(illumina_file, 'r') as illfile, open('tmp.tsv', 'w') as o:
         for line in illfile:
-            if line and '--' not in line and 'Library Index Summary' not in line:
+            if line and '---' not in line and 'Library Index Summary' not in line:
                 o.write(line)
 
     with open('tmp.tsv', 'r') as illumina:
+
         i_reader = csv.DictReader(illumina, delimiter='\t')
+
         for l in i_reader:
 
             sample = l['Library']
